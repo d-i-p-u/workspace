@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "oddkult",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "oddkult-orders",
+      // Replace with the id printed by: npx wrangler d1 create oddkult-orders
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "observability": { "enabled": true }
+  // Secrets (never commit): npx wrangler secret put ADMIN_KEY
+  // Optional:               npx wrangler secret put ORDER_WEBHOOK_URL
+}

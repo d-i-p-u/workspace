@@ -1,0 +1,210 @@
+{
+  "currency": "BDT",
+  "delivery": {
+    "insideDhaka": 70,
+    "outsideDhaka": 130,
+    "freeOver": 2500
+  },
+  "sizes": [
+    { "id": "S", "label": "S · 28–30\"" },
+    { "id": "M", "label": "M · 32–34\"" },
+    { "id": "L", "label": "L · 36–38\"" },
+    { "id": "XL", "label": "XL · 40–42\"" }
+  ],
+  "collections": [
+    { "id": "punk", "name": "Punk", "bn": "পাঙ্ক", "blurb": "Studs, chains, crosses and teeth. Built loud." },
+    { "id": "cult", "name": "Cult", "bn": "কাল্ট", "blurb": "Relic buckles, roses and engraved silver. Worship nothing — wear everything." },
+    { "id": "retro", "name": "Retro", "bn": "রেট্রো", "blurb": "Braided suede and sleek clasps from another decade." }
+  ],
+  "products": [
+    {
+      "id": "blood-rose",
+      "name": "Blood Rose",
+      "type": "Buckle Belt",
+      "collection": "cult",
+      "price": 1450,
+      "badge": "Signature",
+      "tagline": "A red enamel rose set in an antique-silver oval.",
+      "description": "Hand-finished enamel rose buckle on embossed paisley leather. The piece that started the kult. Buckle is detachable, so the strap can be swapped later.",
+      "details": ["Oval zinc-alloy buckle, antique silver finish", "Red enamel rose centre", "Embossed PU leather strap, 3.8 cm wide", "Detachable buckle with snap loop"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p06", "p10", "p08"] },
+        { "id": "brown", "name": "Brown", "swatch": "#4a3428", "images": ["p07", "p10", "p08"] }
+      ]
+    },
+    {
+      "id": "holy-slab",
+      "name": "Holy Slab",
+      "type": "Cross Studded Belt",
+      "collection": "punk",
+      "price": 1790,
+      "badge": "Hot",
+      "tagline": "An oversized brushed cross plate on a triple-row stud strap.",
+      "description": "The loudest thing in the room. A heavy slab-cross buckle on a strap lined with three rows of domed studs. Wear it with baggy denim and a wallet chain.",
+      "details": ["Brushed silver cross plate buckle", "Triple-row domed stud strap", "4 cm wide", "Hook fastening behind the plate"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p20", "p19"] },
+        { "id": "leopard", "name": "Leopard", "swatch": "#b39a78", "images": ["p24"] }
+      ]
+    },
+    {
+      "id": "wyvern",
+      "name": "Wyvern",
+      "type": "Dragon Buckle Belt",
+      "collection": "punk",
+      "price": 1690,
+      "badge": "New",
+      "tagline": "A winged dragon with red eyes, coiled across the buckle.",
+      "description": "Sculpted 3D wyvern buckle with red crystal eyes, on embossed black leather. Choose clean, or with a row of studs running the full length.",
+      "details": ["3D sculpted dragon buckle", "Red crystal eyes", "Embossed strap, 3.8 cm wide", "Studded version has a full stud border"],
+      "variants": [
+        { "id": "classic", "name": "Classic", "swatch": "#141414", "images": ["p25"] },
+        { "id": "studded", "name": "Studded", "swatch": "#2c2c2c", "price": 1790, "images": ["p26"] }
+      ]
+    },
+    {
+      "id": "iron-cross",
+      "name": "Iron Cross",
+      "type": "Stud Belt",
+      "collection": "punk",
+      "price": 1390,
+      "tagline": "Slim black strap, cone studs and a cross keeper.",
+      "description": "A slim everyday punk belt: engraved roller buckle, a cross-stamped keeper and an etched tip, with cone studs scattered along the strap.",
+      "details": ["Engraved antique-silver buckle", "Cross-stamped keeper and etched tip", "Cone studs", "3 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p15", "p16"] }
+      ]
+    },
+    {
+      "id": "chain-gang",
+      "name": "Chain Gang",
+      "type": "Braided Belt",
+      "collection": "punk",
+      "price": 1590,
+      "tagline": "Woven black leather with a hanging chain drop.",
+      "description": "Hand-braided black strap with a western buckle, a fan-engraved tip and a short curb chain hanging from the keeper.",
+      "details": ["Braided strap", "Western buckle with engraved tip", "Detachable curb chain", "3 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p22"] }
+      ]
+    },
+    {
+      "id": "braid-cross",
+      "name": "Braid Cross",
+      "type": "Woven Belt",
+      "collection": "punk",
+      "price": 1350,
+      "tagline": "Braided black leather with a cross keeper.",
+      "description": "Our braided strap without the chain: an engraved buckle, a cross keeper and a pointed silver tip.",
+      "details": ["Braided strap", "Cross-stamped keeper", "Engraved buckle and tip", "3 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p23"] }
+      ]
+    },
+    {
+      "id": "fleur-cross",
+      "name": "Fleur Cross",
+      "type": "Buckle Belt",
+      "collection": "cult",
+      "price": 1450,
+      "tagline": "A gothic fleur cross buckle on embossed black leather.",
+      "description": "A compact fleur-cross buckle on tooled leather. Small enough to wear every day, and it still gets noticed.",
+      "details": ["Fleur-cross zinc-alloy buckle", "Antique silver finish", "Tooled PU leather strap", "3.8 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p21"] }
+      ]
+    },
+    {
+      "id": "reliquary",
+      "name": "Reliquary",
+      "type": "Oval Buckle Belt",
+      "collection": "cult",
+      "price": 1550,
+      "tagline": "A baroque scrollwork oval, made to look like an old relic.",
+      "description": "A domed oval buckle with baroque cross scrollwork, on a riveted black strap.",
+      "details": ["Domed oval scroll buckle", "Antique silver finish", "Riveted strap", "4 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p17"] }
+      ]
+    },
+    {
+      "id": "longhorn",
+      "name": "Longhorn",
+      "type": "Rodeo Studded Belt",
+      "collection": "cult",
+      "price": 1850,
+      "tagline": "A bull-skull plate buckle on a fully studded strap.",
+      "description": "A rodeo plate buckle with a longhorn skull and riders, on an embossed strap edged with studs.",
+      "details": ["Rectangular rodeo plate buckle", "Stud-bordered embossed strap", "4 cm wide", "Hook fastening"],
+      "variants": [
+        { "id": "silver", "name": "Silver / Black", "swatch": "#c9ccd1", "images": ["p27"] },
+        { "id": "brass", "name": "Brass / Brown", "swatch": "#a07a3a", "images": ["p28"] }
+      ]
+    },
+    {
+      "id": "dagger-tip",
+      "name": "Dagger Tip",
+      "type": "Western Belt",
+      "collection": "cult",
+      "price": 1290,
+      "tagline": "A long engraved blade tip, plus a matching buckle and keeper.",
+      "description": "Western three-piece hardware with a long dagger-shaped tip. Five strap colours, from plain black to leopard.",
+      "details": ["3-piece engraved silver hardware", "Long dagger-shaped tip", "PU leather strap, 3.3 cm wide"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p13"] },
+        { "id": "brown", "name": "Brown", "swatch": "#3d2a20", "images": ["p14"] },
+        { "id": "tan", "name": "Tan", "swatch": "#9a5a32", "images": ["p11"] },
+        { "id": "white", "name": "White", "swatch": "#efece6", "images": ["p12"] },
+        { "id": "leopard", "name": "Leopard", "swatch": "#c49a5a", "images": ["p09"] }
+      ]
+    },
+    {
+      "id": "saint",
+      "name": "Saint",
+      "type": "Engraved Western Belt",
+      "collection": "cult",
+      "price": 1190,
+      "tagline": "A classic engraved western buckle with a matching tip.",
+      "description": "Floral-engraved silver western buckle, keeper and tip. Works on denim, cargos and over dresses.",
+      "details": ["Floral-engraved silver hardware", "PU leather strap, 3.3 cm wide", "Stitched edge"],
+      "variants": [
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p30"] },
+        { "id": "oxblood", "name": "Oxblood", "swatch": "#5a1e1e", "images": ["p32"] },
+        { "id": "leopard", "name": "Leopard", "swatch": "#c49a5a", "images": ["p31"] },
+        { "id": "snow", "name": "Snow Leopard", "swatch": "#e8e3da", "images": ["p29"] }
+      ]
+    },
+    {
+      "id": "horseshoe",
+      "name": "Horseshoe",
+      "type": "Braided Suede Belt",
+      "collection": "retro",
+      "price": 1090,
+      "tagline": "Wide braided suede with a big brass horseshoe buckle.",
+      "description": "A '70s-style wide braided suede belt with an oversized antique-brass buckle. Soft, chunky, and good over denim or a long shirt.",
+      "details": ["Braided faux-suede strap", "Oversized antique-brass buckle", "4.5 cm wide"],
+      "variants": [
+        { "id": "chocolate", "name": "Chocolate", "swatch": "#4a3020", "images": ["p02", "p03", "p35"] },
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p04", "p03", "p35"] },
+        { "id": "tan", "name": "Tan", "swatch": "#b0703a", "images": ["p05", "p03", "p35"] }
+      ]
+    },
+    {
+      "id": "hook",
+      "name": "Hook",
+      "type": "Slim Clasp Belt",
+      "collection": "retro",
+      "price": 650,
+      "badge": "Under ৳700",
+      "tagline": "A thin strap with a sculpted silver hook clasp.",
+      "description": "A minimal skinny belt with a polished silver hook-and-loop clasp. Wear it at the waist over dresses, blazers or oversized shirts.",
+      "details": ["Polished silver hook clasp", "Pebbled PU strap, 1.5 cm wide", "Adjustable length"],
+      "variants": [
+        { "id": "brown", "name": "Brown", "swatch": "#4a3020", "images": ["p01"] },
+        { "id": "black", "name": "Black", "swatch": "#141414", "images": ["p33"] },
+        { "id": "tan", "name": "Tan", "swatch": "#9a5a32", "images": ["p34"] },
+        { "id": "taupe", "name": "Taupe", "swatch": "#8a7e74", "images": ["p36"] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ODDKULT Orders</title>
+  <link rel="icon" href="/favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@800&display=swap" rel="stylesheet">
+  <style>
+    :root { --ink:#0b0b0c; --ink-2:#141416; --line:#2e2e32; --bone:#edeae4; --dim:#a9a59d; --blood:#c4162a; --ok:#3ddc84; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--ink); color: var(--bone); font: 14px/1.5 "Space Grotesk", system-ui, sans-serif; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--ink); z-index: 2; }
+    header img { height: 24px; }
+    h1 { font: 800 1rem "Unbounded", sans-serif; text-transform: uppercase; margin: 0; letter-spacing: .02em; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button, select, input { font: 700 12px "Space Mono", monospace; letter-spacing: .06em; text-transform: uppercase; min-height: 40px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--line); background: var(--ink-2); color: var(--bone); cursor: pointer; }
+    input { text-transform: none; letter-spacing: 0; cursor: text; min-width: 220px; }
+    .primary { background: var(--bone); color: var(--ink); border-color: var(--bone); }
+    main { padding: 16px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat { border: 1px solid var(--line); padding: 14px; background: var(--ink-2); }
+    .stat b { display: block; font: 700 1.4rem "Space Mono", monospace; }
+    .stat span { color: var(--dim); font: 12px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .06em; }
+    .wrap { overflow-x: auto; border: 1px solid var(--line); }
+    table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font: 700 11px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); background: var(--ink-2); position: sticky; top: 0; }
+    td.num { font-family: "Space Mono", monospace; white-space: nowrap; }
+    td small { color: var(--dim); display: block; }
+    td select { min-height: 32px; padding: 0 8px; }
+    .s-new { color: var(--blood); } .s-confirmed { color: #f5c542; } .s-shipped { color: #6aa9ff; } .s-delivered { color: var(--ok); }
+    .panel { border: 1px solid var(--line); background: var(--ink-2); padding: 16px; margin-bottom: 16px; }
+    .panel h2 { font: 700 12px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
+    .panel ol { margin: 8px 0 0; padding-left: 20px; color: var(--dim); }
+    code { background: #000; padding: 2px 6px; border: 1px solid var(--line); word-break: break-all; }
+    .login { max-width: 420px; margin: 12vh auto; padding: 24px; border: 1px solid var(--line); display: grid; gap: 12px; text-align: center; }
+    .login img { height: 120px; margin: 0 auto 8px; }
+    .err { color: #ff6b7a; min-height: 1.2em; }
+    .muted { color: var(--dim); }
+  </style>
+</head>
+<body>
+  <div class="login" id="login">
+    <img src="/brand/oddkult-lockup-stacked-chrome.svg" alt="ODDKULT">
+    <h1>Orders admin</h1>
+    <input id="key" type="password" placeholder="Admin key" autocomplete="current-password">
+    <button class="primary" id="go">Open orders</button>
+    <p class="err" id="lerr"></p>
+  </div>
+
+  <div id="app" hidden>
+    <header>
+      <div class="row"><img src="/brand/oddkult-wordmark-chrome.svg" alt="ODDKULT"><h1>Orders</h1></div>
+      <div class="row">
+        <select id="filter">
+          <option value="">All statuses</option>
+          <option>new</option><option>confirmed</option><option>shipped</option><option>delivered</option><option>cancelled</option><option>returned</option>
+        </select>
+        <button id="refresh">Refresh</button>
+        <button class="primary" id="xlsx">Download Excel (.xlsx)</button>
+        <button id="logout">Log out</button>
+      </div>
+    </header>
+    <main>
+      <div class="stats" id="stats"></div>
+      <details class="panel">
+        <summary><b>Connect a live Microsoft Excel sheet</b> <span class="muted">(updates automatically when new orders come in)</span></summary>
+        <ol>
+          <li>Open Excel → <b>Data</b> → <b>Get Data</b> → <b>From Other Sources</b> → <b>From Web</b>.</li>
+          <li>Paste this URL: <code id="csvurl"></code> <button id="copy">Copy</button></li>
+          <li>Click <b>Load</b>. Your orders appear as a table.</li>
+          <li>To auto-update: <b>Data</b> → <b>Queries &amp; Connections</b> → right-click the query → <b>Properties</b> → tick <b>Refresh every 5 minutes</b> and <b>Refresh data when opening the file</b>.</li>
+        </ol>
+        <p class="muted">Keep this URL private: it contains your admin key.</p>
+      </details>
+      <div class="wrap"><table>
+        <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Address</th><th>Items</th><th>Total (COD)</th><th>Status</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+      </table></div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const tk = (n) => "৳" + Number(n).toLocaleString("en-IN");
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    const STATUSES = ["new", "confirmed", "shipped", "delivered", "cancelled", "returned"];
+    let KEY = "";
+    try { KEY = sessionStorage.getItem("ok-admin") || ""; } catch {}
+    let ORDERS = [], COLUMNS = [];
+
+    async function load() {
+      const st = $("#filter").value;
+      const res = await fetch(`/api/orders?key=${encodeURIComponent(KEY)}${st ? "&status=" + st : ""}`);
+      if (res.status === 401) { logout("Wrong key."); return; }
+      const data = await res.json();
+      ORDERS = data.orders; COLUMNS = data.columns;
+      $("#login").hidden = true; $("#app").hidden = false;
+      $("#csvurl").textContent = `${location.origin}/api/orders.csv?key=${encodeURIComponent(KEY)}`;
+      render();
+    }
+
+    function render() {
+      const live = ORDERS.filter((o) => !["cancelled", "returned"].includes(o.status));
+      const today = new Date().toISOString().slice(0, 10);
+      $("#stats").innerHTML = [
+        ["Orders", ORDERS.length],
+        ["New (to confirm)", ORDERS.filter((o) => o.status === "new").length],
+        ["Today", ORDERS.filter((o) => o.created_at.startsWith(today)).length],
+        ["COD value (active)", tk(live.reduce((s, o) => s + o.total, 0))],
+        ["Delivered value", tk(ORDERS.filter((o) => o.status === "delivered").reduce((s, o) => s + o.total, 0))],
+      ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+      $("#rows").innerHTML = ORDERS.length ? ORDERS.map((o) => `<tr>
+        <td class="num"><b>${esc(o.id)}</b></td>
+        <td class="num">${esc(o.created_at)}<small>UTC</small></td>
+        <td>${esc(o.name)}<small><a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.alt_phone ? " / " + esc(o.alt_phone) : ""}</small></td>
+        <td>${esc(o.address)}<small>${esc(o.district)} · ${esc(o.zone)}${o.note ? " · Note: " + esc(o.note) : ""}</small></td>
+        <td>${esc(o.items_summary)}</td>
+        <td class="num">${tk(o.total)}<small>incl. ${tk(o.delivery)} delivery</small></td>
+        <td><select data-id="${esc(o.id)}" class="s-${esc(o.status)}">${STATUSES.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+      </tr>`).join("") : `<tr><td colspan="7" class="muted">No orders yet. Share the site!</td></tr>`;
+    }
+
+    function logout(msg) {
+      KEY = ""; try { sessionStorage.removeItem("ok-admin"); } catch {}
+      $("#app").hidden = true; $("#login").hidden = false; $("#lerr").textContent = msg || "";
+    }
+
+    $("#go").onclick = () => { KEY = $("#key").value.trim(); try { sessionStorage.setItem("ok-admin", KEY); } catch {} load(); };
+    $("#key").onkeydown = (e) => e.key === "Enter" && $("#go").click();
+    $("#refresh").onclick = load;
+    $("#filter").onchange = load;
+    $("#logout").onclick = () => logout();
+    $("#copy").onclick = () => navigator.clipboard.writeText($("#csvurl").textContent).then(() => ($("#copy").textContent = "Copied"));
+    $("#rows").onchange = async (e) => {
+      const sel = e.target.closest("select[data-id]");
+      if (!sel) return;
+      const res = await fetch(`/api/orders/${sel.dataset.id}?key=${encodeURIComponent(KEY)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: sel.value }),
+      });
+      if (res.ok) { const o = ORDERS.find((x) => x.id === sel.dataset.id); o.status = sel.value; render(); }
+      else alert("Couldn't update status");
+    };
+    $("#xlsx").onclick = () => {
+      const rows = ORDERS.map((o) => Object.fromEntries(COLUMNS.map(([k, label]) => [label, o[k]])));
+      const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map((c) => c[1]) });
+      ws["!cols"] = COLUMNS.map(([k]) => ({ wch: k === "address" || k === "items_summary" ? 48 : k === "note" ? 30 : 16 }));
+      ws["!autofilter"] = { ref: ws["!ref"] };
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Orders");
+      XLSX.writeFile(wb, `oddkult-orders-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+    if (KEY) load();
+  </script>
+</body>
+</html>
