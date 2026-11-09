@@ -13,7 +13,7 @@
   <link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -23,12 +23,12 @@
     <div class="announce__track">
       <span>Cash on delivery all over Bangladesh</span><i>✦</i>
       <span>Free delivery over ৳2,500</span><i>✦</i>
-      <span class="bn">ঢাকার ভিতরে ৳৭০ · বাইরে ৳১৩০</span><i>✦</i>
+      <span>Inside Dhaka ৳70 · Outside ৳130</span><i>✦</i>
       <span>Drop 001 — Belts</span><i>✦</i>
       <span>Retro watches coming soon</span><i>✦</i>
       <span>Cash on delivery all over Bangladesh</span><i>✦</i>
       <span>Free delivery over ৳2,500</span><i>✦</i>
-      <span class="bn">ঢাকার ভিতরে ৳৭০ · বাইরে ৳১৩০</span><i>✦</i>
+      <span>Inside Dhaka ৳70 · Outside ৳130</span><i>✦</i>
       <span>Drop 001 — Belts</span><i>✦</i>
       <span>Retro watches coming soon</span><i>✦</i>
     </div>
@@ -76,8 +76,7 @@
           <span>For the</span>
           <span class="chrome-text">odd ones.</span>
         </h1>
-        <p class="hero__sub">Punk and cult hardware for your waist: studs, crosses, roses and dragons, in antique silver.
-          <span class="bn">যারা ভিড়ে মিশে যায় না, তাদের জন্য।</span></p>
+        <p class="hero__sub">Punk and cult hardware for your waist: studs, crosses, roses and dragons, in antique silver.</p>
         <div class="hero__cta">
           <a class="btn btn--chrome" href="#shop">Shop the drop</a>
           <a class="btn btn--ghost" href="#collections">Collections</a>
@@ -137,7 +136,7 @@
         <img src="brand/oddkult-icon-chrome.svg" alt="" class="manifesto__icon" width="120" height="120">
         <p class="manifesto__text">We started ODDKULT because Dhaka's streets deserved hardware with more attitude than a mall belt.
           Every piece is picked for weight, finish and the right amount of trouble.</p>
-        <p class="manifesto__text bn">এটা শুধু বেল্ট না। এটা একটা সিগন্যাল: তুমি আলাদা, আর সেটা লুকাও না।</p>
+        <p class="manifesto__text manifesto__text--sub">Not just a belt. A signal: you're different, and you don't hide it.</p>
       </div>
     </section>
 
@@ -162,7 +161,7 @@
 
     <!-- FAQ -->
     <section class="faq" id="faq" aria-labelledby="faq-h">
-      <div class="section-head"><h2 id="faq-h" class="h2">Help</h2><p class="mono muted">সাহায্য</p></div>
+      <div class="section-head"><h2 id="faq-h" class="h2">Help</h2><p class="mono muted">Delivery · Sizing · Exchange</p></div>
       <details open>
         <summary>How do I pay?</summary>
         <p>We only take Cash on Delivery (COD). Pay the rider when your parcel arrives. The total you see at checkout, delivery included, is the exact amount you pay.</p>
@@ -226,10 +225,10 @@
       </div>
       <div class="checkout__grid">
         <form class="form" data-checkout-form novalidate>
-          <label>Full name <span class="bn muted">নাম</span>
+          <label>Full name
             <input name="name" autocomplete="name" required maxlength="80" placeholder="Your name">
           </label>
-          <label>Mobile number <span class="bn muted">মোবাইল</span>
+          <label>Mobile number
             <input name="phone" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="01XXXXXXXXX" maxlength="14">
           </label>
           <label>Alternate number <span class="muted">(optional)</span>
@@ -240,10 +239,10 @@
             <label class="radio"><input type="radio" name="zone" value="inside" checked> <span>Inside Dhaka <b class="mono">৳70</b></span></label>
             <label class="radio"><input type="radio" name="zone" value="outside"> <span>Outside Dhaka <b class="mono">৳130</b></span></label>
           </fieldset>
-          <label data-district-wrap hidden>District <span class="bn muted">জেলা</span>
+          <label data-district-wrap hidden>District
             <select name="district" data-district></select>
           </label>
-          <label>Full address <span class="bn muted">ঠিকানা</span>
+          <label>Full address
             <textarea name="address" rows="3" required maxlength="400" placeholder="House, road, area, thana"></textarea>
           </label>
           <label>Note <span class="muted">(optional)</span>
@@ -267,7 +266,6 @@
       <h2 class="h2" id="done-title">Welcome to the kult.</h2>
       <p>Your order ID is <b class="mono" data-done-id></b>. We'll call you within 24 hours to confirm.
         Please keep <b class="mono" data-done-total></b> ready for the rider.</p>
-      <p class="bn muted">অর্ডারের জন্য ধন্যবাদ! কনফার্ম করতে আমরা শীঘ্রই কল করব।</p>
       <p class="mono muted" data-preview-note hidden>Preview site: this test order was not sent anywhere.</p>
       <button class="btn btn--chrome" data-close-done>Keep browsing</button>
     </div>

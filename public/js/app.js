@@ -79,7 +79,7 @@ function renderCollections() {
       const cover = coverOf(c);
       return `<button class="col-tile" data-filter-link="${esc(c.id)}">
         ${cover ? `<img src="${img(cover, true)}" alt="" loading="lazy">` : ""}
-        <span class="col-tile__label"><b>${esc(c.name)}</b>${c.bn ? `<em class="bn">${esc(c.bn)}</em>` : ""}</span>
+        <span class="col-tile__label"><b>${esc(c.name)}</b></span>
         <span class="col-tile__blurb">${esc(c.blurb || "")}</span>
       </button>`;
     })

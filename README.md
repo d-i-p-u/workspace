@@ -96,7 +96,7 @@ prices, colours, images and delivery charges. Edit it on GitHub (open the file �
 **Commit changes**). Cloudflare redeploys automatically in about a minute.
 
 - **Change a price:** edit `"price": 1450`. A colour can have its own `"price"` too (see Wyvern).
-- **New category:** add `{ "id": "chains", "name": "Chains", "bn": "চেইন", "blurb": "..." }` to `collections`.
+- **New category:** add `{ "id": "chains", "name": "Chains", "blurb": "..." }` to `collections`.
   Its tile, filter button and menu links appear automatically. Optional `"cover": "p06"` picks the tile image.
 - **Move a product to another category:** change its `"collection"` to that category's `id`.
 - **New product:** copy an existing product block, give it a new `"id"` (lowercase-with-dashes), then

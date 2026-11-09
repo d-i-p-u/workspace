@@ -12,9 +12,9 @@
     { "id": "XL", "label": "XL · 40–42\"" }
   ],
   "collections": [
-    { "id": "punk", "name": "Punk", "bn": "পাঙ্ক", "blurb": "Studs, chains, crosses and teeth. Built loud." },
-    { "id": "cult", "name": "Cult", "bn": "কাল্ট", "blurb": "Relic buckles, roses and engraved silver. Worship nothing — wear everything." },
-    { "id": "retro", "name": "Retro", "bn": "রেট্রো", "blurb": "Braided suede and sleek clasps from another decade." }
+    { "id": "punk", "name": "Punk", "blurb": "Studs, chains, crosses and teeth. Built loud." },
+    { "id": "cult", "name": "Cult", "blurb": "Relic buckles, roses and engraved silver. Worship nothing — wear everything." },
+    { "id": "retro", "name": "Retro", "blurb": "Braided suede and sleek clasps from another decade." }
   ],
   "products": [
     {
