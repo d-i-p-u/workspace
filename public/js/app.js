@@ -14,7 +14,7 @@ const DISTRICTS = ["Bagerhat","Bandarban","Barguna","Barishal","Bhola","Bogura",
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const tk = (n) => "৳" + Number(n).toLocaleString("en-IN");
-const img = (id, sm) => `/img/products/${id}${sm ? "-sm" : ""}.webp`;
+const img = (id, sm) => `img/products/${id}${sm ? "-sm" : ""}.webp`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let DATA = null;
@@ -48,7 +48,7 @@ function cardHTML(p) {
       <span class="card__price">${from}${tk(minPrice(p))}</span>
     </div>
     <div class="swatches" aria-label="${p.variants.length} colours">${p.variants.map((x) => `<span class="sw" style="background:${x.swatch}" title="${esc(x.name)}"></span>`).join("")}</div>
-    <a class="card__link" href="#/p/${p.id}" aria-label="View ${esc(p.name)} ${esc(p.type)}"></a>
+    <a class="card__link" href="#p-${p.id}" aria-label="View ${esc(p.name)} ${esc(p.type)}"></a>
   </article>`;
 }
 
@@ -138,7 +138,7 @@ function openProduct(id, variantId) {
   box.scrollTop = 0;
   document.body.classList.add("locked");
   document.title = `${p.name} ${p.type} — ODDKULT`;
-  if (location.hash !== `#/p/${p.id}`) history.pushState(null, "", `#/p/${p.id}`);
+  if (location.hash !== `#p-${p.id}`) location.hash = `p-${p.id}`;
 }
 
 function closeProduct() {
@@ -147,7 +147,7 @@ function closeProduct() {
   box.hidden = true;
   document.body.classList.remove("locked");
   document.title = "ODDKULT — Punk & Cult Accessories · Bangladesh";
-  if (location.hash.startsWith("#/p/")) history.pushState(null, "", location.pathname + "#shop");
+  if (location.hash.startsWith("#p-")) history.replaceState(null, "", "#shop");
 }
 
 // ---------- Cart ----------
@@ -198,7 +198,7 @@ function renderCart() {
   const body = $("[data-cart-body]");
   const foot = $("[data-cart-foot]");
   if (!lines.length) {
-    body.innerHTML = `<div class="cart__empty"><img src="/brand/oddkult-icon-bone.svg" alt=""><p>Your bag is empty. Not very kult of you.</p><button class="btn btn--ghost" data-close-cart data-go-shop>Shop the drop</button></div>`;
+    body.innerHTML = `<div class="cart__empty"><img src="brand/oddkult-icon-bone.svg" alt=""><p>Your bag is empty. Not very kult of you.</p><button class="btn btn--ghost" data-close-cart data-go-shop>Shop the drop</button></div>`;
     foot.innerHTML = "";
     return;
   }
@@ -272,6 +272,11 @@ async function submitOrder(e) {
   btn.disabled = true;
   btn.textContent = "Placing order…";
   try {
+    if (window.ODDKULT_PREVIEW) {
+      await new Promise((r) => setTimeout(r, 600));
+      const t = totals(data.zone);
+      return finishOrder({ id: "PREVIEW-" + Date.now().toString(36).toUpperCase().slice(-5), total: t.total }, f);
+    }
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -284,6 +289,16 @@ async function submitOrder(e) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || !out.ok) throw new Error(out.error || "Couldn't place the order. Please try again.");
+    finishOrder(out, f);
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Place order · Cash on delivery";
+  }
+}
+
+function finishOrder(out, f) {
     state.cart = [];
     saveCart();
     renderCart();
@@ -292,13 +307,8 @@ async function submitOrder(e) {
     $("[data-done-id]").textContent = out.id;
     $("[data-done-total]").textContent = tk(out.total);
     $("[data-done]").hidden = false;
+    $("[data-preview-note]").hidden = !window.ODDKULT_PREVIEW;
     document.body.classList.add("locked");
-  } catch (ex) {
-    err.textContent = ex.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Place order · Cash on delivery";
-  }
 }
 
 // ---------- Misc ----------
@@ -312,7 +322,7 @@ function toast(msg) {
 }
 
 function route() {
-  const m = location.hash.match(/^#\/p\/([\w-]+)/);
+  const m = location.hash.match(/^#p-([\w-]+)/);
   if (m) openProduct(m[1]);
   else closeProduct();
 }
@@ -338,7 +348,7 @@ async function init() {
   renderSocials();
 
   try {
-    DATA = await (await fetch("/data/products.json")).json();
+    DATA = await (await fetch("data/products.json")).json();
   } catch {
     $("[data-grid]").innerHTML = `<p class="muted">Couldn't load products. Please refresh.</p>`;
     return;

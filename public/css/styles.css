@@ -1,5 +1,6 @@
 /* ODDKULT — brand tokens from the logo pack: Ink, Bone, Chrome (+ one blood accent) */
 :root {
+  color-scheme: dark;
   --ink: #0b0b0c;
   --ink-2: #131315;
   --graphite: #232326;
@@ -114,7 +115,7 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .hero::before { /* faint hourglass pattern */
   content: ""; position: absolute; inset: 0; z-index: -2; opacity: .5;
-  background: url("/brand/oddkult-pattern-hourglass-dark.svg") center/520px repeat;
+  background: url("../brand/oddkult-pattern-hourglass-dark.svg") center/520px repeat;
   mask-image: radial-gradient(ellipse at 30% 50%, #000 0%, transparent 70%);
   -webkit-mask-image: radial-gradient(ellipse at 30% 50%, #000 0%, transparent 70%);
 }
@@ -212,7 +213,7 @@ section { padding: clamp(56px, 9vw, 120px) var(--gutter); }
 .faq details p { margin: 0 0 22px; color: var(--bone-dim); max-width: 64ch; }
 
 /* Footer */
-.footer { border-top: 1px solid var(--line); padding: 56px var(--gutter) 28px; background: var(--ink) url("/brand/oddkult-pattern-hourglass-dark.svg") right bottom/420px no-repeat; }
+.footer { border-top: 1px solid var(--line); padding: 56px var(--gutter) 28px; background: var(--ink) url("../brand/oddkult-pattern-hourglass-dark.svg") right bottom/420px no-repeat; }
 .footer__top { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
 .footer__logo { width: 150px; height: auto; }
 .footer__cols { display: flex; gap: clamp(32px, 6vw, 90px); flex-wrap: wrap; }
