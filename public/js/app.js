@@ -1,13 +1,13 @@
 // ODDKULT storefront — vanilla JS, no build step.
 
-// ---- Edit these to your real handles / numbers -------------------------------------------
+// Contact details, social links and the announcement come from Admin → Settings (/api/catalog → store).
+// These are only used if the live catalogue can't be loaded.
 const CONFIG = {
-  whatsapp: "",            // e.g. "8801712345678" (country code, no +). Leave empty to hide.
-  instagram: "",          // e.g. "https://instagram.com/your-handle". Leave empty to hide.
-  facebook: "",           // e.g. "https://facebook.com/your-page". Leave empty to hide.
-  phone: "",               // e.g. "01712345678" shown in footer. Leave empty to hide.
+  whatsapp: "8801707680854",
+  instagram: "",
+  facebook: "",
+  phone: "01707680854",
 };
-// -----------------------------------------------------------------------------------------
 
 const DISTRICTS = ["Bagerhat","Bandarban","Barguna","Barishal","Bhola","Bogura","Brahmanbaria","Chandpur","Chapai Nawabganj","Chattogram","Chuadanga","Cox's Bazar","Cumilla","Dhaka (outside city)","Dinajpur","Faridpur","Feni","Gaibandha","Gazipur","Gopalganj","Habiganj","Jamalpur","Jashore","Jhalokathi","Jhenaidah","Joypurhat","Khagrachhari","Khulna","Kishoreganj","Kurigram","Kushtia","Lakshmipur","Lalmonirhat","Madaripur","Magura","Manikganj","Meherpur","Moulvibazar","Munshiganj","Mymensingh","Naogaon","Narail","Narayanganj","Narsingdi","Natore","Netrokona","Nilphamari","Noakhali","Pabna","Panchagarh","Patuakhali","Pirojpur","Rajbari","Rajshahi","Rangamati","Rangpur","Satkhira","Shariatpur","Sherpur","Sirajganj","Sunamganj","Sylhet","Tangail","Thakurgaon"];
 
@@ -16,7 +16,9 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const tk = (n) => "৳" + Number(n).toLocaleString("en-IN");
 // Image names: "p06" uses our optimised p06.webp / p06-sm.webp pair.
 // A name with an extension (e.g. "new-belt.jpg") is used as-is from img/products/.
-const img = (id, sm) => (id.includes(".") ? `img/products/${id}` : `img/products/${id}${sm ? "-sm" : ""}.webp`);
+// A name starting with "u/" is a photo uploaded from the admin panel (served from the database).
+const img = (id, sm) =>
+  id.startsWith("u/") ? `/img/${id}` : id.includes(".") ? `img/products/${id}` : `img/products/${id}${sm ? "-sm" : ""}.webp`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let DATA = null;
@@ -31,24 +33,31 @@ function saveCart() {
 const product = (id) => DATA.products.find((p) => p.id === id);
 const variantPrice = (p, v) => v.price ?? p.price;
 const minPrice = (p) => Math.min(...p.variants.map((v) => variantPrice(p, v)));
+const soldOut = (p) => p.stock === 0;
+const lowStock = (p) => typeof p.stock === "number" && p.stock > 0 && p.stock <= 5;
+const store = () => ({ ...CONFIG, ...((DATA && DATA.store) || {}) });
 
 // ---------- Grid ----------
 function cardHTML(p) {
   const v = p.variants[0];
   const second = v.images[1] || p.variants[1]?.images[0];
   const from = p.variants.some((x) => x.price && x.price !== p.price) ? "From " : "";
-  const badge = p.badge ? `<span class="card__badge ${p.badge === "Hot" ? "card__badge--hot" : ""}">${esc(p.badge)}</span>` : "";
-  return `<article class="card">
+  const label = soldOut(p) ? "Sold out" : p.compareAt ? "Sale" : p.badge;
+  const badge = label
+    ? `<span class="card__badge ${soldOut(p) ? "card__badge--out" : label === "Hot" || label === "Sale" ? "card__badge--hot" : ""}">${esc(label)}</span>`
+    : "";
+  return `<article class="card ${soldOut(p) ? "is-out" : ""}">
     <div class="card__media">
       ${badge}
       <img src="${img(v.images[0], true)}" alt="${esc(p.name)} ${esc(p.type)} in ${esc(v.name)}" loading="lazy" width="600" height="600">
       ${second ? `<img src="${img(second, true)}" alt="" loading="lazy" width="600" height="600">` : ""}
-      <button class="card__quick" data-quick="${p.id}">Choose size +</button>
+      <button class="card__quick" data-quick="${p.id}">${soldOut(p) ? "Sold out" : "Choose size +"}</button>
     </div>
     <div class="card__row">
       <div><h3 class="card__name">${esc(p.name)}</h3><p class="card__type">${esc(p.type)}</p></div>
-      <span class="card__price">${from}${tk(minPrice(p))}</span>
+      <span class="card__price">${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}${from}${tk(minPrice(p))}</span>
     </div>
+    ${lowStock(p) ? `<p class="card__stock">Only ${p.stock} left</p>` : ""}
     <div class="swatches" aria-label="${p.variants.length} colours">${p.variants.map((x) => `<span class="sw" style="background:${x.swatch}" title="${esc(x.name)}"></span>`).join("")}</div>
     <a class="card__link" href="#p-${p.id}" aria-label="View ${esc(p.name)} ${esc(p.type)}"></a>
   </article>`;
@@ -123,7 +132,8 @@ function openProduct(id, variantId) {
           <h2 class="pdp__title" id="pdp-title">${esc(p.name)}</h2>
           <p class="pdp__type">${esc(p.type)} — ${esc(p.tagline)}</p>
         </div>
-        <div class="pdp__price">${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
+        <div class="pdp__price">${p.compareAt ? `<s>${tk(p.compareAt)}</s>` : ""}${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
+        ${soldOut(p) ? `<p class="pdp__stock pdp__stock--out">Sold out. Message us on WhatsApp to get notified when it's back.</p>` : lowStock(p) ? `<p class="pdp__stock">Only ${p.stock} left</p>` : ""}
         <div>
           <div class="opt-label mono"><span>Colour</span><span>${esc(v.name)}</span></div>
           <div class="colors">${p.variants.map((x) => `<button class="color-btn ${x.id === v.id ? "is-active" : ""}" data-variant="${x.id}"><span class="sw" style="background:${x.swatch}"></span>${esc(x.name)}</button>`).join("")}</div>
@@ -134,7 +144,9 @@ function openProduct(id, variantId) {
         </div>
         <div class="pdp__buy">
           <div class="qty"><button data-qty="-1" aria-label="Less">−</button><output>${qty}</output><button data-qty="1" aria-label="More">+</button></div>
-          <button class="btn btn--chrome" data-add>Add to bag · ${tk(variantPrice(p, v) * qty)}</button>
+          ${soldOut(p)
+            ? `<button class="btn btn--ghost" disabled>Sold out</button>`
+            : `<button class="btn btn--chrome" data-add>Add to bag · ${tk(variantPrice(p, v) * qty)}</button>`}
         </div>
         <p class="pdp__desc">${esc(p.description)}</p>
         <ul class="pdp__details">${p.details.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>
@@ -152,8 +164,9 @@ function openProduct(id, variantId) {
     if (t.dataset.variant) { v = p.variants.find((x) => x.id === t.dataset.variant); imgIdx = 0; draw(); }
     else if (t.dataset.img) { imgIdx = +t.dataset.img; draw(); }
     else if (t.dataset.size) { size = t.dataset.size; draw(); }
-    else if (t.dataset.qty) { qty = Math.min(10, Math.max(1, qty + +t.dataset.qty)); draw(); }
+    else if (t.dataset.qty) { qty = Math.min(10, typeof p.stock === "number" ? Math.max(p.stock, 1) : 10, Math.max(1, qty + +t.dataset.qty)); draw(); }
     else if ("add" in t.dataset) {
+      if (soldOut(p)) return;
       if (!size) { toast("Pick your waist size first"); $(".sizes", body).animate([{ transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "none" }], { duration: 300 }); return; }
       addToCart(p.id, v.id, size, qty);
       closeProduct();
@@ -357,16 +370,73 @@ function route() {
 }
 
 function renderSocials() {
+  const s = store();
+  const wa = s.whatsapp ? `https://wa.me/${s.whatsapp}?text=${encodeURIComponent("Hi ODDKULT! I have a question.")}` : "";
   const links = [];
-  if (CONFIG.instagram) links.push(`<a class="btn btn--chrome" href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a>`);
-  if (CONFIG.facebook) links.push(`<a class="btn btn--ghost" href="${CONFIG.facebook}" target="_blank" rel="noopener">Facebook</a>`);
-  if (CONFIG.whatsapp) links.push(`<a class="btn btn--ghost" href="https://wa.me/${CONFIG.whatsapp}" target="_blank" rel="noopener">WhatsApp</a>`);
+  if (s.instagram) links.push(`<a class="btn btn--chrome" href="${esc(s.instagram)}" target="_blank" rel="noopener">Instagram</a>`);
+  if (s.facebook) links.push(`<a class="btn btn--ghost" href="${esc(s.facebook)}" target="_blank" rel="noopener">Facebook</a>`);
+  if (wa) links.push(`<a class="btn ${links.length ? "btn--ghost" : "btn--chrome"}" href="${wa}" target="_blank" rel="noopener">WhatsApp us</a>`);
   $("[data-socials]").innerHTML = links.join("");
   const fc = $("[data-footer-contact]");
-  if (CONFIG.phone) fc.insertAdjacentHTML("beforeend", `<a href="tel:${CONFIG.phone}">${CONFIG.phone}</a>`);
-  if (CONFIG.instagram) fc.insertAdjacentHTML("beforeend", `<a href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a>`);
-  if (CONFIG.facebook) fc.insertAdjacentHTML("beforeend", `<a href="${CONFIG.facebook}" target="_blank" rel="noopener">Facebook</a>`);
-  if (CONFIG.whatsapp) fc.insertAdjacentHTML("beforeend", `<a href="https://wa.me/${CONFIG.whatsapp}" target="_blank" rel="noopener">WhatsApp</a>`);
+  fc.innerHTML = `<h4 class="mono">Kult HQ</h4><span>Dhaka, Bangladesh</span>`;
+  if (s.phone) fc.insertAdjacentHTML("beforeend", `<a href="tel:${esc(s.phone)}">Call ${esc(s.phone)}</a>`);
+  if (wa) fc.insertAdjacentHTML("beforeend", `<a href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`);
+  if (s.instagram) fc.insertAdjacentHTML("beforeend", `<a href="${esc(s.instagram)}" target="_blank" rel="noopener">Instagram</a>`);
+  if (s.facebook) fc.insertAdjacentHTML("beforeend", `<a href="${esc(s.facebook)}" target="_blank" rel="noopener">Facebook</a>`);
+  fc.insertAdjacentHTML("beforeend", `<a href="#track" data-open-track>Track your order</a>`);
+  const fab = $("[data-wa-fab]");
+  if (fab) { fab.hidden = !wa; if (wa) fab.href = wa; }
+  if (s.announcement) {
+    const track = $(".announce__track");
+    if (track && !track.dataset.custom) {
+      track.dataset.custom = "1";
+      const item = `<span>${esc(s.announcement)}</span><i>✦</i>`;
+      track.insertAdjacentHTML("afterbegin", item);
+      const half = track.children.length / 2;
+      track.children[Math.floor(half)]?.insertAdjacentHTML("beforebegin", item);
+    }
+  }
+}
+
+function renderDeliveryCopy() {
+  const d = DATA.delivery;
+  $$("[data-d-in]").forEach((el) => (el.textContent = tk(d.insideDhaka)));
+  $$("[data-d-out]").forEach((el) => (el.textContent = tk(d.outsideDhaka)));
+  $$("[data-d-free]").forEach((el) => (el.textContent = tk(d.freeOver)));
+}
+
+function openTrack() {
+  closeMenu();
+  $("[data-track]").hidden = false;
+  document.body.classList.add("locked");
+  setTimeout(() => $("[data-track-form]").oid.focus(), 50);
+}
+function closeTrack() {
+  $("[data-track]").hidden = true;
+  document.body.classList.remove("locked");
+  if (location.hash === "#track") history.replaceState(null, "", location.pathname);
+}
+
+// ---------- Order tracking ----------
+async function trackOrder(e) {
+  e.preventDefault();
+  const f = e.target;
+  const out = $("[data-track-result]");
+  out.innerHTML = `<p class="muted">Checking…</p>`;
+  try {
+    const res = await fetch(`/api/track?id=${encodeURIComponent(f.oid.value.trim())}&phone=${encodeURIComponent(f.phone.value.trim())}`);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "Couldn't check right now.");
+    const steps = ["new", "confirmed", "shipped", "delivered"];
+    const label = { new: "Order received", confirmed: "Confirmed", shipped: "On the way", delivered: "Delivered", cancelled: "Cancelled", returned: "Returned" };
+    const at = steps.indexOf(d.status);
+    out.innerHTML = `
+      <p class="track__status mono">${esc(label[d.status] || d.status)}</p>
+      ${at >= 0 ? `<ol class="track__steps">${steps.map((s, i) => `<li class="${i <= at ? "is-done" : ""}">${label[s]}</li>`).join("")}</ol>` : ""}
+      <p class="muted small">${esc(d.items)} · ${tk(d.total)} cash on delivery · placed ${esc(d.placed)}</p>`;
+  } catch (ex) {
+    out.innerHTML = `<p class="form__error">${esc(ex.message)}</p>`;
+  }
 }
 
 function closeMenu() { $("[data-menu]").hidden = true; document.body.classList.remove("locked"); }
@@ -384,14 +454,26 @@ async function init() {
     $("[data-grid]").innerHTML = `<p class="muted">Couldn't load products. Please refresh.</p>`;
     return;
   }
-  // drop cart lines for products that no longer exist
-  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId));
+  // drop cart lines for products that no longer exist or are sold out
+  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId) && !soldOut(product(l.productId)));
+  renderSocials();
+  renderDeliveryCopy();
   renderCollections();
   renderGrid();
   renderCart();
   route();
 
+  $("[data-track-form]").addEventListener("submit", trackOrder);
+  if (location.hash === "#track") openTrack();
+
   document.addEventListener("click", (e) => {
+    const tr = e.target.closest("[data-open-track],[data-close-track]");
+    if (tr) {
+      e.preventDefault();
+      if ("openTrack" in tr.dataset) openTrack();
+      else closeTrack();
+      return;
+    }
     const t = e.target.closest("[data-filter],[data-filter-link],[data-quick],[data-open-cart],[data-close-cart],[data-open-checkout],[data-close-checkout],[data-close-done],[data-remove],[data-line-qty],[data-open-menu],[data-close-menu],[data-scrim],.menu a");
     if (!t || t.closest("[data-pdp]")) return;
     if (t.dataset.filter) setFilter(t.dataset.filter);
@@ -429,6 +511,7 @@ async function init() {
     if (!$("[data-pdp]").hidden) closeProduct();
     else if ($("[data-cart]").classList.contains("is-open")) closeCart();
     else if (!$("[data-checkout]").hidden) closeCheckout();
+    else if (!$("[data-track]").hidden) closeTrack();
   });
 }
 

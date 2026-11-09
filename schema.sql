@@ -31,3 +31,9 @@ CREATE TABLE IF NOT EXISTS product_overrides (
   active     INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT, collection TEXT NOT NULL, price INTEGER NOT NULL, compare_at INTEGER, badge TEXT, tagline TEXT, description TEXT, details TEXT, variants TEXT NOT NULL, stock INTEGER, active INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL, blurb TEXT, cover TEXT, sort INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, content_type TEXT NOT NULL, data BLOB NOT NULL, created_at TEXT);
+-- then seed with migrations/0003_catalogue_in_d1.sql

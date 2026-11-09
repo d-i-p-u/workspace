@@ -22,13 +22,13 @@
   <div class="announce" aria-label="Announcements">
     <div class="announce__track">
       <span>Cash on delivery all over Bangladesh</span><i>✦</i>
-      <span>Free delivery over ৳2,500</span><i>✦</i>
-      <span>Inside Dhaka ৳70 · Outside ৳130</span><i>✦</i>
+      <span>Free delivery over <b data-d-free>৳2,500</b></span><i>✦</i>
+      <span>Inside Dhaka <b data-d-in>৳70</b> · Outside <b data-d-out>৳130</b></span><i>✦</i>
       <span>Drop 001 — Belts</span><i>✦</i>
       <span>Retro watches coming soon</span><i>✦</i>
       <span>Cash on delivery all over Bangladesh</span><i>✦</i>
-      <span>Free delivery over ৳2,500</span><i>✦</i>
-      <span>Inside Dhaka ৳70 · Outside ৳130</span><i>✦</i>
+      <span>Free delivery over <b data-d-free>৳2,500</b></span><i>✦</i>
+      <span>Inside Dhaka <b data-d-in>৳70</b> · Outside <b data-d-out>৳130</b></span><i>✦</i>
       <span>Drop 001 — Belts</span><i>✦</i>
       <span>Retro watches coming soon</span><i>✦</i>
     </div>
@@ -47,6 +47,7 @@
       <img src="brand/oddkult-wordmark-chrome.svg" alt="ODDKULT" width="160" height="35">
     </a>
     <div class="nav__right">
+      <a class="nav__help" href="#track" data-open-track>Track order</a>
       <a class="nav__help" href="#faq">Help</a>
       <button class="nav__bag" data-open-cart aria-label="Open bag">
         Bag <span class="nav__count" data-cart-count>0</span>
@@ -59,6 +60,7 @@
     <a href="#shop" data-filter-link="all">Shop all</a>
     <div class="menu__cols" data-col-links></div>
     <a href="#soon">Watches — soon</a>
+    <a href="#track" data-open-track>Track your order</a>
     <a href="#faq">Help &amp; FAQ</a>
   </div>
 
@@ -143,7 +145,7 @@
     <!-- PROMISES -->
     <section class="promises" aria-label="Why order from ODDKULT">
       <div class="promise"><b class="mono">01</b><h3>Cash on delivery</h3><p>Pay only when your order reaches you. No advance, no card needed.</p></div>
-      <div class="promise"><b class="mono">02</b><h3>Nationwide delivery</h3><p>1–2 days inside Dhaka (৳70), 2–4 days to the rest of the country (৳130).</p></div>
+      <div class="promise"><b class="mono">02</b><h3>Nationwide delivery</h3><p>1–2 days inside Dhaka (<b data-d-in>৳70</b>), 2–4 days to the rest of the country (<b data-d-out>৳130</b>).</p></div>
       <div class="promise"><b class="mono">03</b><h3>7-day exchange</h3><p>Wrong size? Message us within 7 days and we'll swap it.</p></div>
       <div class="promise"><b class="mono">04</b><h3>Check before you pay</h3><p>Open the parcel in front of the rider before you hand over the cash.</p></div>
     </section>
@@ -168,7 +170,7 @@
       </details>
       <details>
         <summary>How long does delivery take, and what does it cost?</summary>
-        <p>Inside Dhaka: 1–2 working days, ৳70. Outside Dhaka: 2–4 working days, ৳130. Delivery is free on orders over ৳2,500.</p>
+        <p>Inside Dhaka: 1–2 working days, <b data-d-in>৳70</b>. Outside Dhaka: 2–4 working days, <b data-d-out>৳130</b>. Delivery is free on orders over <b data-d-free>৳2,500</b>.</p>
       </details>
       <details>
         <summary>How do I pick my belt size?</summary>
@@ -236,8 +238,8 @@
           </label>
           <fieldset class="zone">
             <legend>Delivery area</legend>
-            <label class="radio"><input type="radio" name="zone" value="inside" checked> <span>Inside Dhaka <b class="mono">৳70</b></span></label>
-            <label class="radio"><input type="radio" name="zone" value="outside"> <span>Outside Dhaka <b class="mono">৳130</b></span></label>
+            <label class="radio"><input type="radio" name="zone" value="inside" checked> <span>Inside Dhaka <b class="mono" data-d-in>৳70</b></span></label>
+            <label class="radio"><input type="radio" name="zone" value="outside"> <span>Outside Dhaka <b class="mono" data-d-out>৳130</b></span></label>
           </fieldset>
           <label data-district-wrap hidden>District
             <select name="district" data-district></select>
@@ -264,12 +266,31 @@
       <img src="brand/oddkult-seal-bone.svg" alt="" class="done__seal">
       <p class="mono kicker">Order received</p>
       <h2 class="h2" id="done-title">Welcome to the kult.</h2>
-      <p>Your order ID is <b class="mono" data-done-id></b>. We'll call you within 24 hours to confirm.
+      <p>Your order ID is <b class="mono" data-done-id></b>. We'll call you within 24 hours to confirm. Save the ID to track your order any time.
         Please keep <b class="mono" data-done-total></b> ready for the rider.</p>
       <p class="mono muted" data-preview-note hidden>Preview site: this test order was not sent anywhere.</p>
       <button class="btn btn--chrome" data-close-done>Keep browsing</button>
     </div>
   </div>
+
+  <!-- TRACK ORDER -->
+  <div class="track" data-track hidden role="dialog" aria-modal="true" aria-labelledby="track-title">
+    <div class="track__inner">
+      <button class="iconbtn track__close" data-close-track aria-label="Close">✕</button>
+      <p class="mono kicker">Order status</p>
+      <h2 class="h2" id="track-title">Track your order</h2>
+      <form class="form" data-track-form>
+        <label>Order ID <input name="oid" required placeholder="OK-XXXXXXX" autocomplete="off" autocapitalize="characters"></label>
+        <label>Mobile number used for the order <input name="phone" type="tel" inputmode="numeric" required placeholder="01XXXXXXXXX"></label>
+        <button class="btn btn--chrome btn--block" type="submit">Check status</button>
+      </form>
+      <div data-track-result></div>
+    </div>
+  </div>
+
+  <a class="wa-fab" data-wa-fab hidden target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3Zm0 23.6a10.6 10.6 0 0 1-5.4-1.5l-.4-.2-3.9 1 1-3.8-.3-.4A10.6 10.6 0 1 1 16 26.6Zm5.8-7.9c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7 0a8.7 8.7 0 0 1-4.3-3.8c-.3-.6.3-.5.9-1.7.1-.2 0-.4 0-.5l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.3 14.3 0 0 0 5.5 4.8c2 .9 2.8 1 3.9.8a3.3 3.3 0 0 0 2.1-1.5 2.7 2.7 0 0 0 .2-1.5c-.1-.1-.3-.2-.6-.4Z"/></svg>
+  </a>
 
   <div class="toast" data-toast role="status" aria-live="polite"></div>
 

@@ -326,11 +326,19 @@ section { padding: clamp(56px, 9vw, 120px) var(--gutter); }
   .nav__links, .nav__help { display: none; }
   .nav__menu { display: flex; }
   .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 28px; }
-  .hero__media { height: 360px; order: -1; }
-  .hero__seal { right: 2%; top: -20px; width: 84px; }
-  .collections__grid { grid-template-columns: 1fr; }
-  .col-tile { aspect-ratio: 16/10; }
+  .hero__media { height: clamp(200px, 56vw, 300px); order: 2; margin-top: 8px; }
+  .hero__img--a { inset: 0 22% 0 0; width: 78%; height: 100%; }
+  .hero__img--b { width: 42%; }
+  .hero__seal { right: 2%; top: -14px; width: 72px; }
+  .collections__grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .col-tile { aspect-ratio: 3/4; }
+  .col-tile__label { left: 10px; bottom: 30px; flex-direction: column; gap: 0; }
+  .col-tile__label b { font-size: clamp(1rem, 4.6vw, 1.6rem); }
+  .col-tile__blurb { display: none; }
   .pdp__inner { grid-template-columns: 1fr; }
+  .pdp__gallery { background: #f5f4f2; }
+  .pdp__main { max-height: 56vh; object-fit: contain; }
+  .pdp__thumbs button { flex-basis: 56px; }
   .pdp__close { position: fixed; top: 12px; right: 12px; }
   .checkout__grid { grid-template-columns: 1fr; }
   .summary { position: static; order: -1; }
@@ -341,12 +349,49 @@ section { padding: clamp(56px, 9vw, 120px) var(--gutter); }
   .grid, .pdp__related .grid { grid-template-columns: 1fr 1fr; gap: 22px 10px; }
   .card__quick { display: none; }
   .card__name { font-size: .82rem; }
+  .card__type { font-size: .78rem; }
+  .card__price { font-size: .86rem; }
+  .hero__title { font-size: clamp(2.6rem, 13vw, 3.6rem); }
+  .hero__facts { gap: 6px 14px; margin-top: 24px; }
+  .hero__cta .btn { flex: 1 1 140px; }
+  section { padding-top: 48px; padding-bottom: 48px; }
+  .soon { margin: 24px var(--gutter); padding: 36px 20px; }
+  .pdp__info { padding: 20px 16px 32px; gap: 18px; }
+  .pdp__title { font-size: clamp(1.8rem, 9vw, 2.4rem); }
+  .pdp__related { padding: 32px 16px; }
+  .line { grid-template-columns: 64px 1fr auto; gap: 10px; }
+  .line img { width: 64px; height: 64px; }
+  .footer__logo { width: 110px; }
   .card__row { flex-direction: column; gap: 4px; }
   .promises { grid-template-columns: 1fr; }
   .promise { border-right: 0; margin-right: 0; border-bottom: 1px solid var(--line); padding: 28px 0; }
   .zone { grid-template-columns: 1fr; }
   .shop__controls { width: 100%; justify-content: space-between; }
 }
+/* Stock, sale and status */
+.card__badge--out { background: #3a3a3e; color: var(--bone); }
+.card.is-out .card__media img { filter: grayscale(1) opacity(.55); }
+.card__price s, .pdp__price s { color: var(--muted); font-weight: 400; margin-right: 6px; font-size: .85em; }
+.card__stock, .pdp__stock { margin: -4px 0 0; color: #ff8a8a; font: 700 .72rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.pdp__stock { margin: -10px 0 0; }
+.pdp__stock--out { color: var(--bone-dim); text-transform: none; letter-spacing: 0; font: 500 .92rem var(--f-body); }
+.btn[disabled]:not([data-place-order]) { opacity: .6; cursor: not-allowed; }
+
+/* Track order */
+.track { position: fixed; inset: 0; z-index: 92; background: rgba(0,0,0,.72); display: grid; place-items: center; padding: 16px; animation: fade .25s; }
+.track__inner { position: relative; width: min(460px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--ink); border: 1px solid var(--line); padding: 28px 22px; display: grid; gap: 18px; }
+.track__inner .h2 { font-size: clamp(1.6rem, 6vw, 2.2rem); }
+.track__close { position: absolute; top: 14px; right: 14px; }
+.track__status { font-size: 1rem; color: var(--bone); margin: 0; }
+.track__steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.track__steps li { font: 700 .62rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-top: 3px solid var(--graphite); padding-top: 8px; }
+.track__steps li.is-done { color: var(--bone); border-color: var(--bone); }
+
+/* WhatsApp button */
+.wa-fab { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 70; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: #25d366; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.45); transition: transform .2s var(--ease); }
+.wa-fab:hover { transform: scale(1.06); }
+body.locked .wa-fab { display: none; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
