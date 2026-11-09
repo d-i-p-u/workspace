@@ -63,11 +63,29 @@ function cardHTML(p) {
   </article>`;
 }
 
+// ---------- Motion: fade sections in as they scroll into view ----------
+const motionOK = "IntersectionObserver" in window && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const revealer = motionOK
+  ? new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.classList.add("in"); revealer.unobserve(e.target); }
+    }), { rootMargin: "0px 0px -8% 0px" })
+  : null;
+function reveal(els) {
+  if (!revealer) return;
+  [...els].forEach((el, i) => {
+    if (el.classList.contains("in")) return;
+    el.classList.add("reveal");
+    el.style.transitionDelay = `${(i % 4) * 70}ms`;
+    revealer.observe(el);
+  });
+}
+
 function renderGrid() {
   let list = DATA.products.filter((p) => state.filter === "all" || p.collection === state.filter);
   if (state.sort === "low") list = [...list].sort((a, b) => minPrice(a) - minPrice(b));
   if (state.sort === "high") list = [...list].sort((a, b) => minPrice(b) - minPrice(a));
   $("[data-grid]").innerHTML = list.map(cardHTML).join("");
+  reveal($$("[data-grid] .card"));
 }
 
 function renderCollections() {
@@ -459,6 +477,12 @@ async function init() {
   renderSocials();
   renderDeliveryCopy();
   renderCollections();
+  reveal($$(".col-tile"));
+  reveal($$(".section-head, .promise, .manifesto__icon, .manifesto__text, .soon__copy, .faq details, .footer__top"));
+  const nav = $(".nav");
+  const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 24);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
   renderGrid();
   renderCart();
   route();
