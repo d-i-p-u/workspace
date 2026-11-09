@@ -47,7 +47,7 @@
   <div class="login" id="login">
     <img src="/brand/oddkult-lockup-stacked-chrome.svg" alt="ODDKULT">
     <h1>Orders admin</h1>
-    <input id="key" type="password" placeholder="Admin key" autocomplete="current-password">
+    <input id="key" type="password" placeholder="Admin password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="primary" id="go">Open orders</button>
     <p class="err" id="lerr"></p>
   </div>
@@ -132,7 +132,9 @@
     }
 
     $("#go").onclick = () => { KEY = $("#key").value.trim(); try { sessionStorage.setItem("ok-admin", KEY); } catch {} load(); };
-    $("#key").onkeydown = (e) => e.key === "Enter" && $("#go").click();
+    $("#key").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") $("#go").click();
+    });
     $("#refresh").onclick = load;
     $("#filter").onchange = load;
     $("#logout").onclick = () => logout();
