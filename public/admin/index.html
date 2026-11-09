@@ -48,6 +48,9 @@
     <img src="/brand/oddkult-lockup-stacked-chrome.svg" alt="ODDKULT">
     <h1>Orders admin</h1>
     <input id="key" type="password" placeholder="Admin password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="muted" style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px">
+      <input type="checkbox" id="showkey" style="min-height:auto;min-width:auto"> Show password
+    </label>
     <button class="primary" id="go">Open orders</button>
     <p class="err" id="lerr"></p>
   </div>
@@ -132,6 +135,7 @@
     }
 
     $("#go").onclick = () => { KEY = $("#key").value.trim(); try { sessionStorage.setItem("ok-admin", KEY); } catch {} load(); };
+    $("#showkey").addEventListener("change", (e) => { $("#key").type = e.target.checked ? "text" : "password"; });
     $("#key").addEventListener("keydown", (e) => {
       if (e.key === "Enter") $("#go").click();
     });
