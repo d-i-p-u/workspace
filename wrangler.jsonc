@@ -3,6 +3,11 @@
   "name": "workspace",
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "oddkult.com", "custom_domain": true },
+    { "pattern": "www.oddkult.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -12,7 +17,6 @@
     {
       "binding": "DB",
       "database_name": "oddkult-orders",
-      // Replace with the id printed by: npx wrangler d1 create oddkult-orders
       "database_id": "fe7a8162-3c0d-4428-a64c-2313251f341b"
     }
   ],
