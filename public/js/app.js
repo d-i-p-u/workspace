@@ -3,8 +3,8 @@
 // ---- Edit these to your real handles / numbers -------------------------------------------
 const CONFIG = {
   whatsapp: "",            // e.g. "8801712345678" (country code, no +). Leave empty to hide.
-  instagram: "https://instagram.com/oddkult",
-  facebook: "https://facebook.com/oddkult",
+  instagram: "",          // e.g. "https://instagram.com/your-handle". Leave empty to hide.
+  facebook: "",           // e.g. "https://facebook.com/your-page". Leave empty to hide.
   phone: "",               // e.g. "01712345678" shown in footer. Leave empty to hide.
 };
 // -----------------------------------------------------------------------------------------

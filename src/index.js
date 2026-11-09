@@ -142,7 +142,7 @@ async function createOrder(request, env, ctx) {
 
   const record = {
     id,
-    created_at: new Date().toISOString(),
+    created_at: toBangladeshTime(new Date().toISOString().slice(0, 19).replace("T", " ")) + " (Bangladesh time)",
     name,
     phone,
     alt_phone: altPhone || "",
@@ -174,7 +174,7 @@ async function createOrder(request, env, ctx) {
 
 const COLUMNS = [
   ["id", "Order ID"],
-  ["created_at", "Date (UTC)"],
+  ["created_bd", "Date (Bangladesh time)"],
   ["status", "Status"],
   ["name", "Customer"],
   ["phone", "Phone"],
@@ -198,7 +198,18 @@ async function listOrders(env, url) {
     ? env.DB.prepare("SELECT * FROM orders WHERE status = ?1 ORDER BY created_at DESC LIMIT ?2").bind(status, limit)
     : env.DB.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?1").bind(limit);
   const { results } = await q.all();
-  return results.map((r) => ({ ...r, zone: r.zone === "inside" ? "Inside Dhaka" : "Outside Dhaka" }));
+  return results.map((r) => ({
+    ...r,
+    created_bd: toBangladeshTime(r.created_at),
+    zone: r.zone === "inside" ? "Inside Dhaka" : "Outside Dhaka",
+  }));
+}
+
+// D1 stores UTC ("YYYY-MM-DD HH:MM:SS"); Bangladesh is UTC+6 with no daylight saving.
+export function toBangladeshTime(utc) {
+  const d = new Date(String(utc).replace(" ", "T") + "Z");
+  if (Number.isNaN(d.getTime())) return String(utc ?? "");
+  return new Date(d.getTime() + 6 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
 }
 
 function toCSV(rows) {

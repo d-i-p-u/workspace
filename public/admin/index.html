@@ -110,17 +110,17 @@
 
     function render() {
       const live = ORDERS.filter((o) => !["cancelled", "returned"].includes(o.status));
-      const today = new Date().toISOString().slice(0, 10);
+      const today = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10); // Bangladesh date
       $("#stats").innerHTML = [
         ["Orders", ORDERS.length],
         ["New (to confirm)", ORDERS.filter((o) => o.status === "new").length],
-        ["Today", ORDERS.filter((o) => o.created_at.startsWith(today)).length],
+        ["Today", ORDERS.filter((o) => (o.created_bd || "").startsWith(today)).length],
         ["COD value (active)", tk(live.reduce((s, o) => s + o.total, 0))],
         ["Delivered value", tk(ORDERS.filter((o) => o.status === "delivered").reduce((s, o) => s + o.total, 0))],
       ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
       $("#rows").innerHTML = ORDERS.length ? ORDERS.map((o) => `<tr>
         <td class="num"><b>${esc(o.id)}</b></td>
-        <td class="num">${esc(o.created_at)}<small>UTC</small></td>
+        <td class="num">${esc(o.created_bd || o.created_at)}<small>Bangladesh time</small></td>
         <td>${esc(o.name)}<small><a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>${o.alt_phone ? " / " + esc(o.alt_phone) : ""}</small></td>
         <td>${esc(o.address)}<small>${esc(o.district)} · ${esc(o.zone)}${o.note ? " · Note: " + esc(o.note) : ""}</small></td>
         <td>${esc(o.items_summary)}</td>
