@@ -32,6 +32,7 @@
     td.num { font-family: "Space Mono", monospace; white-space: nowrap; }
     td small { color: var(--dim); display: block; }
     td select { min-height: 32px; padding: 0 8px; }
+    td input.note { min-height: 32px; min-width: 180px; padding: 0 8px; font: 13px "Space Grotesk", sans-serif; text-transform: none; letter-spacing: 0; }
     .s-new { color: var(--blood); } .s-confirmed { color: #f5c542; } .s-shipped { color: #6aa9ff; } .s-delivered { color: var(--ok); }
     .panel { border: 1px solid var(--line); background: var(--ink-2); padding: 16px; margin-bottom: 16px; }
     .panel h2 { font: 700 12px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
@@ -63,6 +64,7 @@
           <option value="">All statuses</option>
           <option>new</option><option>confirmed</option><option>shipped</option><option>delivered</option><option>cancelled</option><option>returned</option>
         </select>
+        <span class="muted" id="synced" style="font:12px 'Space Mono',monospace"></span>
         <button id="refresh">Refresh</button>
         <button class="primary" id="xlsx">Download Excel (.xlsx)</button>
         <button id="logout">Log out</button>
@@ -81,8 +83,8 @@
         <p class="muted">Keep this URL private: it contains your admin key.</p>
       </details>
       <div class="wrap"><table>
-        <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Address</th><th>Items</th><th>Total (COD)</th><th>Status</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+        <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Address</th><th>Items</th><th>Total (COD)</th><th>Status</th><th>Admin note</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
       </table></div>
     </main>
   </div>
@@ -125,9 +127,20 @@
         <td>${esc(o.address)}<small>${esc(o.district)} · ${esc(o.zone)}${o.note ? " · Note: " + esc(o.note) : ""}</small></td>
         <td>${esc(o.items_summary)}</td>
         <td class="num">${tk(o.total)}<small>incl. ${tk(o.delivery)} delivery</small></td>
-        <td><select data-id="${esc(o.id)}" class="s-${esc(o.status)}">${STATUSES.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-      </tr>`).join("") : `<tr><td colspan="7" class="muted">No orders yet. Share the site!</td></tr>`;
+        <td><select data-id="${esc(o.id)}" class="s-${esc(o.status)}">${STATUSES.map((s) => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select>${o.updated_bd ? `<small>Updated ${esc(o.updated_bd)}</small>` : ""}</td>
+        <td><input class="note" data-note="${esc(o.id)}" value="${esc(o.admin_note)}" placeholder="Courier, tracking…" maxlength="500"></td>
+      </tr>`).join("") : `<tr><td colspan="8" class="muted">No orders yet. Share the site!</td></tr>`;
+      $("#synced").textContent = "Updated " + new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit" });
     }
+
+    // Auto-refresh every 30 s so changes made in the Google Sheet appear here,
+    // unless the admin is typing in a note or using a dropdown.
+    setInterval(() => {
+      if (!KEY || $("#app").hidden || document.hidden) return;
+      const a = document.activeElement;
+      if (a && a.closest && a.closest("#rows")) return;
+      load();
+    }, 30000);
 
     function logout(msg) {
       KEY = ""; try { sessionStorage.removeItem("ok-admin"); } catch {}
@@ -150,8 +163,22 @@
         method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: sel.value }),
       });
       if (res.ok) { const o = ORDERS.find((x) => x.id === sel.dataset.id); o.status = sel.value; render(); }
-      else alert("Couldn't update status");
+      else $("#synced").textContent = "Couldn't update status. Check your connection and try again.";
     };
+    $("#rows").addEventListener("focusout", async (e) => {
+      const inp = e.target.closest("input[data-note]");
+      if (!inp) return;
+      const o = ORDERS.find((x) => x.id === inp.dataset.note);
+      if (!o || (o.admin_note || "") === inp.value) return;
+      const res = await fetch(`/api/orders/${o.id}?key=${encodeURIComponent(KEY)}`, {
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ admin_note: inp.value }),
+      });
+      if (res.ok) { o.admin_note = inp.value; $("#synced").textContent = "Note saved"; }
+      else $("#synced").textContent = "Couldn't save the note. Try again.";
+    });
+    $("#rows").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.matches("input[data-note]")) e.target.blur();
+    });
     $("#xlsx").onclick = () => {
       const rows = ORDERS.map((o) => Object.fromEntries(COLUMNS.map(([k, label]) => [label, o[k]])));
       const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map((c) => c[1]) });

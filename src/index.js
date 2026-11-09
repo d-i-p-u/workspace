@@ -38,8 +38,61 @@ function timingSafeEqual(a, b) {
   return r === 0;
 }
 
+// The live catalogue: products.json plus price / visibility overrides saved from the
+// Google Sheet (or any admin client) in the product_overrides table.
+// A price override moves the product's base price; colours with their own price move by the same amount.
+export async function getCatalog(env) {
+  let rows = [];
+  try {
+    ({ results: rows } = await env.DB.prepare("SELECT product_id, price, active FROM product_overrides").all());
+  } catch {
+    rows = []; // table not created yet: serve products.json as-is
+  }
+  const ov = new Map(rows.map((r) => [r.product_id, r]));
+  const products = catalog.products
+    .filter((p) => (ov.get(p.id)?.active ?? 1) !== 0)
+    .map((p) => {
+      const o = ov.get(p.id);
+      if (!o || o.price == null) return p;
+      const delta = o.price - p.price;
+      return {
+        ...p,
+        price: o.price,
+        variants: p.variants.map((v) => (v.price != null ? { ...v, price: v.price + delta } : v)),
+      };
+    });
+  return { ...catalog, products };
+}
+
+async function listProducts(env) {
+  let rows = [];
+  try {
+    ({ results: rows } = await env.DB.prepare("SELECT product_id, price, active, updated_at FROM product_overrides").all());
+  } catch {
+    rows = [];
+  }
+  const ov = new Map(rows.map((r) => [r.product_id, r]));
+  return catalog.products.map((p) => {
+    const o = ov.get(p.id) || {};
+    const collection = catalog.collections.find((c) => c.id === p.collection);
+    return {
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      collection: collection ? collection.name : p.collection,
+      price: o.price ?? p.price,
+      default_price: p.price,
+      active: (o.active ?? 1) !== 0,
+      colors: p.variants.map((v) => v.name + (v.price != null ? ` (+${v.price - p.price})` : "")).join(", "),
+      url: `https://oddkult.com/#p-${p.id}`,
+      updated_bd: o.updated_at ? toBangladeshTime(o.updated_at) : "",
+    };
+  });
+}
+
 // Price an order using the catalog only — the browser's prices are never trusted.
-export function priceOrder(items, zone) {
+export function priceOrder(items, zone, cat = catalog) {
+  const catalog = cat;
   if (!Array.isArray(items) || items.length === 0) throw new Error("Your bag is empty.");
   if (items.length > 20) throw new Error("Too many line items.");
   const sizes = new Set(catalog.sizes.map((s) => s.id));
@@ -100,7 +153,7 @@ async function createOrder(request, env, ctx) {
 
   let priced;
   try {
-    priced = priceOrder(body.items, zone);
+    priced = priceOrder(body.items, zone, await getCatalog(env));
   } catch (e) {
     return json({ error: e.message }, 400);
   }
@@ -188,7 +241,9 @@ const COLUMNS = [
   ["delivery", "Delivery (BDT)"],
   ["total", "COD Total (BDT)"],
   ["payment", "Payment"],
-  ["note", "Note"],
+  ["note", "Customer note"],
+  ["admin_note", "Admin note"],
+  ["updated_bd", "Last updated"],
 ];
 
 async function listOrders(env, url) {
@@ -201,6 +256,8 @@ async function listOrders(env, url) {
   return results.map((r) => ({
     ...r,
     created_bd: toBangladeshTime(r.created_at),
+    updated_bd: r.updated_at ? toBangladeshTime(r.updated_at) : "",
+    admin_note: r.admin_note || "",
     zone: r.zone === "inside" ? "Inside Dhaka" : "Outside Dhaka",
   }));
 }
@@ -253,15 +310,64 @@ export default {
           });
         }
 
+        // Public catalogue with live prices (used by the storefront)
+        if (pathname === "/api/catalog" && request.method === "GET") {
+          return json(await getCatalog(env));
+        }
+
         const m = pathname.match(/^\/api\/orders\/(OK-[A-Z0-9]+)$/);
         if (m && request.method === "PATCH") {
           if (!isAdmin(request, env)) return json({ error: "Unauthorised" }, 401);
-          const { status } = await request.json().catch(() => ({}));
-          if (!STATUSES.includes(status)) return json({ error: "Bad status" }, 400);
-          const res = await env.DB.prepare("UPDATE orders SET status = ?1, updated_at = datetime('now') WHERE id = ?2")
-            .bind(status, m[1])
+          const body = await request.json().catch(() => ({}));
+          const sets = [];
+          const args = [];
+          if (body.status !== undefined) {
+            const status = String(body.status).trim().toLowerCase();
+            if (!STATUSES.includes(status)) return json({ error: `Status must be one of: ${STATUSES.join(", ")}` }, 400);
+            sets.push(`status = ?${args.push(status)}`);
+          }
+          if (body.admin_note !== undefined) sets.push(`admin_note = ?${args.push(clean(body.admin_note, 500))}`);
+          if (!sets.length) return json({ error: "Nothing to update" }, 400);
+          const res = await env.DB.prepare(
+            `UPDATE orders SET ${sets.join(", ")}, updated_at = datetime('now') WHERE id = ?${args.push(m[1])}`
+          )
+            .bind(...args)
             .run();
           return json({ ok: res.meta.changes === 1 });
+        }
+
+        if (pathname === "/api/products" && request.method === "GET") {
+          if (!isAdmin(request, env)) return json({ error: "Unauthorised" }, 401);
+          return json({ products: await listProducts(env) });
+        }
+
+        const pm = pathname.match(/^\/api\/products\/([a-z0-9-]+)$/);
+        if (pm && request.method === "PATCH") {
+          if (!isAdmin(request, env)) return json({ error: "Unauthorised" }, 401);
+          const product = catalog.products.find((p) => p.id === pm[1]);
+          if (!product) return json({ error: "Unknown product" }, 404);
+          const body = await request.json().catch(() => ({}));
+          const cur =
+            (await env.DB.prepare("SELECT price, active FROM product_overrides WHERE product_id = ?1").bind(product.id).first()) ||
+            { price: null, active: 1 };
+          let price = cur.price;
+          let active = cur.active;
+          if (body.price !== undefined) {
+            const n = Math.round(Number(String(body.price).replace(/[^\d.]/g, "")));
+            if (!(n >= 50 && n <= 100000)) return json({ error: "Price must be a number between 50 and 100000" }, 400);
+            price = n === product.price ? null : n;
+          }
+          if (body.active !== undefined) {
+            const v = String(body.active).trim().toLowerCase();
+            active = ["false", "no", "0", "hide", "hidden", "off"].includes(v) ? 0 : 1;
+          }
+          await env.DB.prepare(
+            `INSERT INTO product_overrides (product_id, price, active, updated_at) VALUES (?1, ?2, ?3, datetime('now'))
+             ON CONFLICT(product_id) DO UPDATE SET price = excluded.price, active = excluded.active, updated_at = excluded.updated_at`
+          )
+            .bind(product.id, price, active)
+            .run();
+          return json({ ok: true, product: (await listProducts(env)).find((p) => p.id === product.id) });
         }
 
         return json({ error: "Not found" }, 404);

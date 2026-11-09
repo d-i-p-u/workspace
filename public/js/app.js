@@ -377,7 +377,9 @@ async function init() {
   renderSocials();
 
   try {
-    DATA = await (await fetch("data/products.json")).json();
+    // Live catalogue (prices / visibility set from the Google Sheet); static file as fallback.
+    const live = await fetch("/api/catalog", { cache: "no-store" }).catch(() => null);
+    DATA = live && live.ok ? await live.json() : await (await fetch("data/products.json")).json();
   } catch {
     $("[data-grid]").innerHTML = `<p class="muted">Couldn't load products. Please refresh.</p>`;
     return;

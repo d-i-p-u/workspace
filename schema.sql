@@ -17,8 +17,17 @@ CREATE TABLE IF NOT EXISTS orders (
   total         INTEGER NOT NULL,
   payment       TEXT NOT NULL DEFAULT 'COD',
   status        TEXT NOT NULL DEFAULT 'new',
+  admin_note    TEXT,
   ip            TEXT,
   user_agent    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders (created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders (phone, created_at);
+
+-- Price / visibility overrides edited from the Google Sheet or admin tools
+CREATE TABLE IF NOT EXISTS product_overrides (
+  product_id TEXT PRIMARY KEY,
+  price      INTEGER,
+  active     INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT
+);
