@@ -491,6 +491,18 @@ async function init() {
   if (location.hash === "#track") openTrack();
 
   document.addEventListener("click", (e) => {
+    // Logo → back to the very top of the page (closing anything that is open)
+    if (e.target.closest("[data-to-top]")) {
+      e.preventDefault();
+      closeProduct();
+      closeCart();
+      closeMenu();
+      if (!$("[data-checkout]").hidden) closeCheckout();
+      if (!$("[data-track]").hidden) closeTrack();
+      history.replaceState(null, "", location.pathname);
+      window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      return;
+    }
     const tr = e.target.closest("[data-open-track],[data-close-track]");
     if (tr) {
       e.preventDefault();
