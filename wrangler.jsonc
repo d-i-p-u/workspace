@@ -13,7 +13,7 @@
       "binding": "DB",
       "database_name": "oddkult-orders",
       // Replace with the id printed by: npx wrangler d1 create oddkult-orders
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "fe7a8162-3c0d-4428-a64c-2313251f341b"
     }
   ],
   "observability": { "enabled": true }
