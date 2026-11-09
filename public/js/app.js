@@ -14,7 +14,9 @@ const DISTRICTS = ["Bagerhat","Bandarban","Barguna","Barishal","Bhola","Bogura",
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const tk = (n) => "৳" + Number(n).toLocaleString("en-IN");
-const img = (id, sm) => `img/products/${id}${sm ? "-sm" : ""}.webp`;
+// Image names: "p06" uses our optimised p06.webp / p06-sm.webp pair.
+// A name with an extension (e.g. "new-belt.jpg") is used as-is from img/products/.
+const img = (id, sm) => (id.includes(".") ? `img/products/${id}` : `img/products/${id}${sm ? "-sm" : ""}.webp`);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let DATA = null;
@@ -57,6 +59,33 @@ function renderGrid() {
   if (state.sort === "low") list = [...list].sort((a, b) => minPrice(a) - minPrice(b));
   if (state.sort === "high") list = [...list].sort((a, b) => minPrice(b) - minPrice(a));
   $("[data-grid]").innerHTML = list.map(cardHTML).join("");
+}
+
+function renderCollections() {
+  const cols = DATA.collections;
+  const coverOf = (c) => {
+    if (c.cover) return c.cover;
+    const p = DATA.products.find((x) => x.collection === c.id);
+    return p ? p.variants[0].images[0] : null;
+  };
+  $$("[data-col-links]").forEach((el) => {
+    el.innerHTML = cols.map((c) => `<a href="#shop" data-filter-link="${esc(c.id)}">${esc(c.name)}</a>`).join("");
+  });
+  $("[data-col-chips]").innerHTML = cols
+    .map((c) => `<button class="chip" data-filter="${esc(c.id)}" role="tab" aria-selected="false">${esc(c.name)}</button>`)
+    .join("");
+  $("[data-col-tiles]").innerHTML = cols
+    .map((c) => {
+      const cover = coverOf(c);
+      return `<button class="col-tile" data-filter-link="${esc(c.id)}">
+        ${cover ? `<img src="${img(cover, true)}" alt="" loading="lazy">` : ""}
+        <span class="col-tile__label"><b>${esc(c.name)}</b>${c.bn ? `<em class="bn">${esc(c.bn)}</em>` : ""}</span>
+        <span class="col-tile__blurb">${esc(c.blurb || "")}</span>
+      </button>`;
+    })
+    .join("");
+  const pad = (n) => String(n).padStart(2, "0");
+  $("[data-col-count]").textContent = `${pad(cols.length)} collections / ${DATA.products.length} designs`;
 }
 
 function setFilter(f) {
@@ -355,6 +384,7 @@ async function init() {
   }
   // drop cart lines for products that no longer exist
   state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId));
+  renderCollections();
   renderGrid();
   renderCart();
   route();

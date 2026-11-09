@@ -40,9 +40,7 @@
     </button>
     <nav class="nav__links" aria-label="Primary">
       <a href="#shop" data-filter-link="all">Shop</a>
-      <a href="#shop" data-filter-link="punk">Punk</a>
-      <a href="#shop" data-filter-link="cult">Cult</a>
-      <a href="#shop" data-filter-link="retro">Retro</a>
+      <span class="nav__cols" data-col-links></span>
       <a href="#soon">Watches <sup>soon</sup></a>
     </nav>
     <a class="nav__logo" href="#top" aria-label="ODDKULT home">
@@ -59,9 +57,7 @@
   <div class="menu" data-menu hidden>
     <button class="menu__close" data-close-menu aria-label="Close menu">Close ✕</button>
     <a href="#shop" data-filter-link="all">Shop all</a>
-    <a href="#shop" data-filter-link="punk">Punk</a>
-    <a href="#shop" data-filter-link="cult">Cult</a>
-    <a href="#shop" data-filter-link="retro">Retro</a>
+    <div class="menu__cols" data-col-links></div>
     <a href="#soon">Watches — soon</a>
     <a href="#faq">Help &amp; FAQ</a>
   </div>
@@ -98,25 +94,9 @@
     <section class="collections" id="collections" aria-labelledby="col-h">
       <div class="section-head">
         <h2 id="col-h" class="h2">Pick your kult</h2>
-        <p class="mono muted">03 collections / 13 designs</p>
+        <p class="mono muted" data-col-count></p>
       </div>
-      <div class="collections__grid">
-        <button class="col-tile" data-filter-link="punk">
-          <img src="img/products/p20-sm.webp" alt="" loading="lazy">
-          <span class="col-tile__label"><b>Punk</b><em class="bn">পাঙ্ক</em></span>
-          <span class="col-tile__blurb">Studs, chains, crosses, teeth.</span>
-        </button>
-        <button class="col-tile" data-filter-link="cult">
-          <img src="img/products/p10-sm.webp" alt="" loading="lazy">
-          <span class="col-tile__label"><b>Cult</b><em class="bn">কাল্ট</em></span>
-          <span class="col-tile__blurb">Relic buckles and engraved silver.</span>
-        </button>
-        <button class="col-tile" data-filter-link="retro">
-          <img src="img/products/p03-sm.webp" alt="" loading="lazy">
-          <span class="col-tile__label"><b>Retro</b><em class="bn">রেট্রো</em></span>
-          <span class="col-tile__blurb">Braided suede, '70s brass.</span>
-        </button>
-      </div>
+      <div class="collections__grid" data-col-tiles></div>
     </section>
 
     <!-- SHOP -->
@@ -126,9 +106,7 @@
         <div class="shop__controls">
           <div class="chips" role="tablist" aria-label="Filter by collection">
             <button class="chip is-active" data-filter="all" role="tab" aria-selected="true">All</button>
-            <button class="chip" data-filter="punk" role="tab" aria-selected="false">Punk</button>
-            <button class="chip" data-filter="cult" role="tab" aria-selected="false">Cult</button>
-            <button class="chip" data-filter="retro" role="tab" aria-selected="false">Retro</button>
+            <span class="chips__cols" data-col-chips></span>
           </div>
           <label class="sort mono">
             <span class="sr-only">Sort</span>
@@ -212,7 +190,7 @@
     <div class="footer__top">
       <img src="brand/oddkult-lockup-stacked-chrome.svg" alt="ODDKULT" class="footer__logo" width="200" height="200">
       <div class="footer__cols">
-        <div><h4 class="mono">Shop</h4><a href="#shop" data-filter-link="punk">Punk</a><a href="#shop" data-filter-link="cult">Cult</a><a href="#shop" data-filter-link="retro">Retro</a></div>
+        <div><h4 class="mono">Shop</h4><span class="footer__cols-links" data-col-links></span></div>
         <div><h4 class="mono">Help</h4><a href="#faq">Delivery</a><a href="#faq">Size guide</a><a href="#faq">Exchange</a></div>
         <div data-footer-contact><h4 class="mono">Kult HQ</h4><span>Dhaka, Bangladesh</span></div>
       </div>

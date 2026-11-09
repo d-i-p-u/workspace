@@ -89,6 +89,24 @@ Every order is saved in the database. There are three ways to get orders into Ex
 Excel columns: Order ID, Date, Status, Customer, Phone, Alt Phone, Zone, District, Address, Items, Qty,
 Subtotal, Delivery, COD Total, Payment, Note.
 
+## Editing products and categories (no coding)
+
+Everything on the shop comes from **`public/data/products.json`**: collections (categories), products,
+prices, colours, images and delivery charges. Edit it on GitHub (open the file → pencil icon → change →
+**Commit changes**). Cloudflare redeploys automatically in about a minute.
+
+- **Change a price:** edit `"price": 1450`. A colour can have its own `"price"` too (see Wyvern).
+- **New category:** add `{ "id": "chains", "name": "Chains", "bn": "চেইন", "blurb": "..." }` to `collections`.
+  Its tile, filter button and menu links appear automatically. Optional `"cover": "p06"` picks the tile image.
+- **Move a product to another category:** change its `"collection"` to that category's `id`.
+- **New product:** copy an existing product block, give it a new `"id"` (lowercase-with-dashes), then
+  change the name, type, price, collection, text and variants.
+- **New photos:** upload square JPG/PNG/WebP files to `public/img/products/` (Add file → Upload files),
+  then reference them **with the extension**, e.g. `"images": ["skull-chain.jpg"]`.
+  Existing names like `"p06"` (no extension) are our optimised photo pairs.
+- **Remove a product:** delete its block. Mind the commas between blocks: a broken JSON file shows
+  "Couldn't load products".
+
 ### বাংলায় সংক্ষেপে
 - পেমেন্ট শুধু ক্যাশ অন ডেলিভারি। ডেলিভারি চার্জ ঢাকার ভিতরে ৳৭০, বাইরে ৳১৩০, আর ৳২,৫০০-এর বেশি অর্ডারে ফ্রি।
 - নতুন অর্ডার এলে সেটা Excel-এ আসে। Excel-এ **Data → From Web**-এ গিয়ে admin পেজের লিংকটা দিন, তাহলে প্রতি ৫ মিনিটে নিজে থেকেই আপডেট হবে।

@@ -90,6 +90,8 @@ input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--line);
 }
 .nav__links { display: flex; gap: 26px; font: 500 .8rem/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+.nav__cols, .chips__cols, .footer__cols-links { display: contents; }
+.menu__cols { display: flex; flex-direction: column; gap: 6px; }
 .nav__links a { opacity: .8; transition: opacity .2s; }
 .nav__links a:hover { opacity: 1; }
 .nav__links sup { color: var(--blood); font-size: .6rem; }
