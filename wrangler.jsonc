@@ -4,6 +4,8 @@
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
+  // Keep variables set in the Cloudflare dashboard (e.g. ADMIN_KEY) when Git deploys run.
+  "keep_vars": true,
   "routes": [
     { "pattern": "oddkult.com", "custom_domain": true },
     { "pattern": "www.oddkult.com", "custom_domain": true }
