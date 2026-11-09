@@ -218,8 +218,12 @@ function toCSV(rows) {
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // block spreadsheet formula injection
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  // 01712345678 -> 01712-345678 so Excel / Google Sheets keep the leading 0 (they treat it as text)
+  const phone = (p) => (/^0\d{10}$/.test(p || "") ? `${p.slice(0, 5)}-${p.slice(5)}` : p || "");
   const head = COLUMNS.map((c) => esc(c[1])).join(",");
-  const body = rows.map((r) => COLUMNS.map(([k]) => esc(r[k])).join(",")).join("\r\n");
+  const body = rows
+    .map((r) => COLUMNS.map(([k]) => esc(k === "phone" || k === "alt_phone" ? phone(r[k]) : r[k])).join(","))
+    .join("\r\n");
   return "﻿" + head + "\r\n" + body + "\r\n"; // BOM so Excel reads Bangla text correctly
 }
 
