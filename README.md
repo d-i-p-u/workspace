@@ -111,3 +111,24 @@ prices, colours, images and delivery charges. Edit it on GitHub (open the file �
 - পেমেন্ট শুধু ক্যাশ অন ডেলিভারি। ডেলিভারি চার্জ ঢাকার ভিতরে ৳৭০, বাইরে ৳১৩০, আর ৳২,৫০০-এর বেশি অর্ডারে ফ্রি।
 - নতুন অর্ডার এলে সেটা Excel-এ আসে। Excel-এ **Data → From Web**-এ গিয়ে admin পেজের লিংকটা দিন, তাহলে প্রতি ৫ মিনিটে নিজে থেকেই আপডেট হবে।
 - দাম বদলাতে চাইলে `public/data/products.json` ফাইলে দাম এডিট করুন।
+
+## Security
+
+- Security headers on every response: HSTS, CSP (`script-src 'self'`), X-Frame-Options DENY, nosniff,
+  Referrer-Policy, Permissions-Policy (`public/_headers` for static files, `secure()` in the Worker).
+- HTTP → HTTPS and www → apex redirects.
+- Orders: JSON only (blocks cross-site form posts), 20 KB body limit, 15 orders per device per hour,
+  5 per phone per hour, honeypot field. Prices and stock are always checked on the server.
+- Order tracking: 30 lookups per device per 10 minutes; needs order ID **and** phone.
+- Admin: password via `x-admin-key` header; 10 wrong passwords from one device lock it for 15 minutes.
+  Use a long password in the `ADMIN_KEY` variable (Cloudflare → workspace → Settings).
+- Text starting with `= + - @` is neutralised before it reaches Excel or Google Sheets.
+- Product image references are validated; uploads accept only JPG/PNG/WebP up to 1.5 MB.
+
+## Search engines (SEO)
+
+- Every product has its own page: `https://oddkult.com/p/<product-id>` with its own title, description,
+  social preview image and Product structured data (price in BDT, stock, images, brand).
+- Home page carries OnlineStore + WebSite + ItemList structured data, generated from the live catalogue.
+- `https://oddkult.com/sitemap.xml` lists the home page and every visible product (with images);
+  `robots.txt` points to it and keeps `/admin/` and `/api/` out of search.

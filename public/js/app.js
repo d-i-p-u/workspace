@@ -18,10 +18,11 @@ const tk = (n) => "৳" + Number(n).toLocaleString("en-IN");
 // A name with an extension (e.g. "new-belt.jpg") is used as-is from img/products/.
 // A name starting with "u/" is a photo uploaded from the admin panel (served from the database).
 const img = (id, sm) =>
-  id.startsWith("u/") ? `/img/${id}` : id.includes(".") ? `img/products/${id}` : `img/products/${id}${sm ? "-sm" : ""}.webp`;
+  id.startsWith("u/") ? `/img/${id}` : id.includes(".") ? `/img/products/${id}` : `/img/products/${id}${sm ? "-sm" : ""}.webp`;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let DATA = null;
+const HOME_TITLE = "ODDKULT | Punk & Cult Belts and Accessories in Bangladesh";
 const state = { filter: "all", sort: "featured", cart: loadCart() };
 
 function loadCart() {
@@ -59,7 +60,7 @@ function cardHTML(p) {
     </div>
     ${lowStock(p) ? `<p class="card__stock">Only ${p.stock} left</p>` : ""}
     <div class="swatches" aria-label="${p.variants.length} colours">${p.variants.map((x) => `<span class="sw" style="background:${x.swatch}" title="${esc(x.name)}"></span>`).join("")}</div>
-    <a class="card__link" href="#p-${p.id}" aria-label="View ${esc(p.name)} ${esc(p.type)}"></a>
+    <a class="card__link" href="/p/${p.id}" data-pid="${p.id}" aria-label="View ${esc(p.name)} ${esc(p.type)}"></a>
   </article>`;
 }
 
@@ -197,8 +198,8 @@ function openProduct(id, variantId) {
   box.hidden = false;
   box.scrollTop = 0;
   document.body.classList.add("locked");
-  document.title = `${p.name} ${p.type} — ODDKULT`;
-  if (location.hash !== `#p-${p.id}`) location.hash = `p-${p.id}`;
+  document.title = `${p.name} ${p.type} | ODDKULT Bangladesh`;
+  if (location.pathname !== `/p/${p.id}`) history.pushState(null, "", `/p/${p.id}`);
 }
 
 function closeProduct() {
@@ -206,8 +207,8 @@ function closeProduct() {
   if (box.hidden) return;
   box.hidden = true;
   document.body.classList.remove("locked");
-  document.title = "ODDKULT — Punk & Cult Accessories · Bangladesh";
-  if (location.hash.startsWith("#p-")) history.replaceState(null, "", "#shop");
+  document.title = HOME_TITLE;
+  if (location.pathname.startsWith("/p/") || location.hash.startsWith("#p-")) history.pushState(null, "", "/");
 }
 
 // ---------- Cart ----------
@@ -258,7 +259,7 @@ function renderCart() {
   const body = $("[data-cart-body]");
   const foot = $("[data-cart-foot]");
   if (!lines.length) {
-    body.innerHTML = `<div class="cart__empty"><img src="brand/oddkult-icon-bone.svg" alt=""><p>Your bag is empty. Not very kult of you.</p><button class="btn btn--ghost" data-close-cart data-go-shop>Shop the drop</button></div>`;
+    body.innerHTML = `<div class="cart__empty"><img src="/brand/oddkult-icon-bone.svg" alt=""><p>Your bag is empty. Not very kult of you.</p><button class="btn btn--ghost" data-close-cart data-go-shop>Shop the drop</button></div>`;
     foot.innerHTML = "";
     return;
   }
@@ -381,9 +382,12 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("is-on"), 2200);
 }
 
+// Product pages live at /p/<id> (Google indexes these). Old #p-<id> links still work.
 function route() {
-  const m = location.hash.match(/^#p-([\w-]+)/);
-  if (m) openProduct(m[1]);
+  const legacy = location.hash.match(/^#p-([\w-]+)/);
+  if (legacy) history.replaceState(null, "", `/p/${legacy[1]}`);
+  const m = location.pathname.match(/^\/p\/([\w-]+)\/?$/);
+  if (m && product(m[1])) openProduct(m[1]);
   else closeProduct();
 }
 
@@ -467,7 +471,7 @@ async function init() {
   try {
     // Live catalogue (prices / visibility set from the Google Sheet); static file as fallback.
     const live = await fetch("/api/catalog", { cache: "no-store" }).catch(() => null);
-    DATA = live && live.ok ? await live.json() : await (await fetch("data/products.json")).json();
+    DATA = live && live.ok ? await live.json() : await (await fetch("/data/products.json")).json();
   } catch {
     $("[data-grid]").innerHTML = `<p class="muted">Couldn't load products. Please refresh.</p>`;
     return;
@@ -501,6 +505,13 @@ async function init() {
       if (!$("[data-track]").hidden) closeTrack();
       history.replaceState(null, "", location.pathname);
       window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      return;
+    }
+    // Product links are real URLs (/p/<id>); open them in place without a page load
+    const pl = e.target.closest("a.card__link[data-pid]");
+    if (pl && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+      e.preventDefault();
+      openProduct(pl.dataset.pid);
       return;
     }
     const tr = e.target.closest("[data-open-track],[data-close-track]");

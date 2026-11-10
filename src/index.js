@@ -64,6 +64,51 @@ function timingSafeEqual(a, b) {
   return r === 0;
 }
 
+/* ------------------------------------------------------------------ security */
+
+const SITE = "https://oddkult.com";
+const CSP_SITE =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; " +
+  "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests";
+const SECURITY_HEADERS = {
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "cross-origin-opener-policy": "same-origin",
+};
+function secure(res, { html = false } = {}) {
+  const r = new Response(res.body, res);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) r.headers.set(k, v);
+  if (html || (r.headers.get("content-type") || "").includes("text/html")) r.headers.set("content-security-policy", CSP_SITE);
+  return r;
+}
+const clientIP = (request) => request.headers.get("cf-connecting-ip") || "unknown";
+
+// Fixed-window counter in D1. Returns true when `key` has gone over `limit` within `windowSec`.
+async function overLimit(env, key, limit, windowSec, { count = true } = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  if (!count) {
+    const r = await env.DB.prepare("SELECT n, reset FROM rate_limits WHERE k = ?1").bind(key).first();
+    return Boolean(r && r.reset >= now && r.n > limit);
+  }
+  const r = await env.DB.prepare(
+    `INSERT INTO rate_limits (k, n, reset) VALUES (?1, 1, ?2)
+     ON CONFLICT(k) DO UPDATE SET n = CASE WHEN reset < ?3 THEN 1 ELSE n + 1 END,
+                                  reset = CASE WHEN reset < ?3 THEN ?2 ELSE reset END
+     RETURNING n`
+  )
+    .bind(key, now + windowSec, now)
+    .first();
+  return Boolean(r && r.n > limit);
+}
+
+// Text that starts with = + - @ would run as a formula in Excel / Google Sheets.
+const sheetSafe = (v) => (typeof v === "string" && /^[=+\-@\t\r]/.test(v) ? "'" + v : v);
+const SAFE_IMAGE = /^(u\/[a-z0-9]+\.(webp|jpg|png)|[a-z0-9][a-z0-9._-]{0,60})$/i;
+
 // D1 stores UTC ("YYYY-MM-DD HH:MM:SS"); Bangladesh is UTC+6 with no daylight saving.
 export function toBangladeshTime(utc) {
   const d = new Date(String(utc).replace(" ", "T") + "Z");
@@ -85,6 +130,7 @@ async function seedOnce(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL, blurb TEXT, cover TEXT, sort INTEGER NOT NULL DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, content_type TEXT NOT NULL, data BLOB NOT NULL, created_at TEXT)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, n INTEGER NOT NULL, reset INTEGER NOT NULL)"),
   ]);
   const done = await env.DB.prepare("SELECT value FROM settings WHERE key = 'catalogue_seeded'").first();
   if (done) return;
@@ -252,6 +298,10 @@ function orderId() {
 }
 
 async function createOrder(request, env, ctx) {
+  // JSON only: blocks cross-site form posts (a form can't send application/json without a CORS preflight)
+  if (!(request.headers.get("content-type") || "").toLowerCase().startsWith("application/json")) return bad("Invalid request.", 415);
+  if (Number(request.headers.get("content-length") || 0) > 20000) return bad("Request too large.", 413);
+  if (await overLimit(env, `order:${clientIP(request)}`, 15, 3600)) return bad("Too many orders from this device. Please call or WhatsApp us.", 429);
   let body;
   try {
     body = await request.json();
@@ -422,7 +472,7 @@ function readProductInput(b, existing = {}) {
         name: vname || "Default",
         swatch: /^#[0-9a-f]{6}$/i.test(v.swatch || "") ? v.swatch : "#141414",
         ...(vp && vp > 0 ? { price: vp } : {}),
-        images: (Array.isArray(v.images) ? v.images : []).map((x) => clean(x, 80)).filter(Boolean).slice(0, 8),
+        images: (Array.isArray(v.images) ? v.images : []).map((x) => clean(x, 80)).filter((x) => SAFE_IMAGE.test(x)).slice(0, 8),
       };
     })
     .filter((v) => v.images.length);
@@ -591,9 +641,133 @@ async function sheetData(env, url) {
     fields: SHEET_TABS[key].columns.map((c) => c[0]),
     editable: SHEET_TABS[key].columns.map((c) => c[2] === "edit"),
     dates: SHEET_TABS[key].columns.map((c) => c[2] === "date"),
-    rows: rows.map((r) => SHEET_TABS[key].columns.map(([f]) => r[f] ?? "")),
+    rows: rows.map((r) => SHEET_TABS[key].columns.map(([f]) => sheetSafe(r[f] ?? ""))),
   });
   return { version: 2, tabs: [tab("orders", orders), tab("products", productRows)] };
+}
+
+/* ------------------------------------------------------------------ router */
+
+/* ------------------------------------------------------------------ search engines (SEO) */
+
+const absImg = (id) => (!id ? `${SITE}/brand/og-image.jpg` : id.startsWith("u/") ? `${SITE}/img/${id}` : id.includes(".") ? `${SITE}/img/products/${id}` : `${SITE}/img/products/${id}.webp`);
+const escHtml = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// JSON inside <script> must not be able to close the tag
+const ldJSON = (obj) => JSON.stringify(obj).replace(/</g, "\\u003c");
+
+function productLD(p, cat) {
+  const colName = cat.collections.find((c) => c.id === p.collection)?.name || p.collection;
+  const prices = p.variants.map((v) => v.price ?? p.price);
+  return {
+    "@type": "Product",
+    name: `${p.name} ${p.type}`.trim(),
+    url: `${SITE}/p/${p.id}`,
+    image: [...new Set(p.variants.flatMap((v) => v.images))].slice(0, 6).map(absImg),
+    description: p.description || p.tagline || `${p.name} ${p.type} by ODDKULT`,
+    sku: p.id,
+    brand: { "@type": "Brand", name: "ODDKULT" },
+    category: `${colName} belts`,
+    color: p.variants.map((v) => v.name).join(", "),
+    offers: {
+      "@type": "AggregateOffer",
+      priceCurrency: "BDT",
+      lowPrice: Math.min(...prices),
+      highPrice: Math.max(...prices),
+      offerCount: p.variants.length,
+      availability: p.stock === 0 ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+      url: `${SITE}/p/${p.id}`,
+      seller: { "@type": "Organization", name: "ODDKULT" },
+      areaServed: "BD",
+    },
+  };
+}
+
+// Serves index.html with page-specific title, description, canonical URL, social preview and
+// structured data, so Google sees real product information in the HTML.
+async function seoPage(request, env, product) {
+  const cat = await getCatalog(env);
+  const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
+  const org = {
+    "@type": "OnlineStore",
+    "@id": `${SITE}/#store`,
+    name: "ODDKULT",
+    url: `${SITE}/`,
+    logo: `${SITE}/brand/instagram-profile-1080.png`,
+    image: `${SITE}/brand/og-image.jpg`,
+    description: "ODDKULT is a punk and cult accessories brand from Dhaka, Bangladesh: studded, cross, rose and western belts with cash on delivery across Bangladesh.",
+    telephone: cat.store.phone ? `+88${cat.store.phone}` : undefined,
+    address: { "@type": "PostalAddress", addressLocality: "Dhaka", addressCountry: "BD" },
+    areaServed: "BD",
+    currenciesAccepted: "BDT",
+    paymentAccepted: "Cash on delivery",
+    sameAs: [cat.store.instagram, cat.store.facebook].filter(Boolean),
+  };
+  let title, desc, canonical, image, ld;
+  if (product) {
+    const price = Math.min(...product.variants.map((v) => v.price ?? product.price));
+    title = `${product.name} ${product.type} | ODDKULT Bangladesh`;
+    desc = `${product.name} ${product.type} by ODDKULT: ${product.tagline || product.description}`.slice(0, 150) + ` ৳${price.toLocaleString("en-IN")}, cash on delivery across Bangladesh.`;
+    canonical = `${SITE}/p/${product.id}`;
+    image = absImg(product.variants[0]?.images[0]);
+    ld = { "@context": "https://schema.org", "@graph": [org, productLD(product, cat), {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "ODDKULT", item: `${SITE}/` },
+        { "@type": "ListItem", position: 2, name: `${product.name} ${product.type}`, item: canonical },
+      ],
+    }] };
+  } else {
+    title = "ODDKULT | Punk & Cult Belts and Accessories in Bangladesh";
+    desc = "ODDKULT: punk and cult belts from Dhaka. Studded, cross, rose, dragon and western buckle belts from ৳650. Cash on delivery all over Bangladesh.";
+    canonical = `${SITE}/`;
+    image = `${SITE}/brand/og-image.jpg`;
+    ld = { "@context": "https://schema.org", "@graph": [
+      org,
+      { "@type": "WebSite", "@id": `${SITE}/#website`, name: "ODDKULT", url: `${SITE}/`, publisher: { "@id": `${SITE}/#store` }, inLanguage: "en" },
+      { "@type": "ItemList", name: "ODDKULT belts", itemListElement: cat.products.map((p, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE}/p/${p.id}`, name: `${p.name} ${p.type}` })) },
+    ] };
+  }
+  const meta = (attr, key, val) => `<meta ${attr}="${key}" content="${escHtml(val)}">`;
+  const head = [
+    `<link rel="canonical" href="${canonical}">`,
+    meta("property", "og:type", product ? "product" : "website"),
+    meta("property", "og:site_name", "ODDKULT"),
+    meta("property", "og:url", canonical),
+    meta("property", "og:image", image),
+    meta("name", "twitter:card", "summary_large_image"),
+    meta("name", "twitter:title", title),
+    meta("name", "twitter:description", desc),
+    meta("name", "twitter:image", image),
+    `<script type="application/ld+json">${ldJSON(ld)}</script>`,
+  ].join("\n  ");
+  const out = new HTMLRewriter()
+    .on("title", { element(el) { el.setInnerContent(title); } })
+    .on('meta[name="description"]', { element(el) { el.setAttribute("content", desc); } })
+    .on('meta[property="og:title"]', { element(el) { el.setAttribute("content", title); } })
+    .on('meta[property="og:description"]', { element(el) { el.setAttribute("content", desc); } })
+    .on('meta[property="og:image"]', { element(el) { el.remove(); } })
+    .on("head", { element(el) { el.append(head, { html: true }); } })
+    .transform(page);
+  const res = new Response(out.body, out);
+  res.headers.set("content-type", "text/html; charset=utf-8");
+  res.headers.set("cache-control", "public, max-age=0, must-revalidate");
+  return res;
+}
+
+async function sitemap(env) {
+  const cat = await getCatalog(env);
+  const day = new Date().toISOString().slice(0, 10);
+  const urls = [`<url><loc>${SITE}/</loc><lastmod>${day}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`].concat(
+    cat.products.map((p) =>
+      `<url><loc>${SITE}/p/${p.id}</loc><lastmod>${(p.updated_at || day).slice(0, 10)}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>` +
+      [...new Set(p.variants.flatMap((v) => v.images))].slice(0, 5).map((im) => `<image:image><image:loc>${absImg(im)}</image:loc></image:image>`).join("") +
+      `</url>`
+    )
+  );
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${urls.join("\n")}\n</urlset>\n`,
+    { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } }
+  );
 }
 
 /* ------------------------------------------------------------------ router */
@@ -601,11 +775,46 @@ async function sheetData(env, url) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // Cloudflare tells us the visitor's scheme; local dev has no such header and is left alone
+    if (request.headers.get("x-forwarded-proto") === "http") {
+      url.protocol = "https:";
+      return Response.redirect(url.toString(), 301);
+    }
+    if (url.hostname === "www.oddkult.com") {
+      url.hostname = "oddkult.com";
+      return Response.redirect(url.toString(), 301);
+    }
+    return secure(await handle(request, env, ctx, url));
+  },
+};
+
+async function handle(request, env, ctx, url) {
     const { pathname } = url;
     const method = request.method;
 
     if (pathname.startsWith("/img/u/") && method === "GET") {
       return serveImage(env, decodeURIComponent(pathname.slice(7)));
+    }
+
+    // Pages Google should index with real titles and product data
+    if (method === "GET" && (pathname === "/" || pathname === "/index.html" || pathname.startsWith("/p/") || pathname === "/sitemap.xml")) {
+      try {
+        await ensureSeeded(env);
+        if (pathname === "/sitemap.xml") return await sitemap(env);
+        if (pathname.startsWith("/p/")) {
+          const id = pathname.slice(3).replace(/\/+$/, "");
+          const product = (await loadProducts(env)).find((p) => p.id === id);
+          if (!product) {
+            const nf = await env.ASSETS.fetch(new Request(new URL("/404.html", request.url)));
+            return new Response(nf.body, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+          }
+          return await seoPage(request, env, product);
+        }
+        return await seoPage(request, env, null);
+      } catch (e) {
+        console.error("seo page failed", e);
+        return env.ASSETS.fetch(request);
+      }
     }
 
     if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
@@ -616,6 +825,7 @@ export default {
       if (pathname === "/api/catalog" && method === "GET") return json(await getCatalog(env));
       if (pathname === "/api/orders" && method === "POST") return await createOrder(request, env, ctx);
       if (pathname === "/api/track" && method === "GET") {
+        if (await overLimit(env, `track:${clientIP(request)}`, 30, 600)) return bad("Too many lookups. Please wait a few minutes.", 429);
         const id = clean(url.searchParams.get("id"), 20).toUpperCase();
         const phone = normalisePhone(url.searchParams.get("phone"));
         if (!id || !phone) return bad("Enter your order ID and phone number.");
@@ -629,8 +839,13 @@ export default {
         });
       }
 
-      // ---------- admin
+      // ---------- admin (10 wrong passwords from one device → locked for 15 minutes)
+      const authKey = `authfail:${clientIP(request)}`;
+      if (await overLimit(env, authKey, 10, 900, { count: false })) {
+        return bad("Too many wrong passwords. Try again in 15 minutes.", 429);
+      }
       if (!isAdmin(request, env)) {
+        await overLimit(env, authKey, 10, 900);
         return pathname === "/api/orders.csv" ? new Response("Unauthorised", { status: 401 }) : bad("Unauthorised", 401);
       }
 
@@ -744,5 +959,4 @@ export default {
       console.error(e);
       return bad("Something went wrong. Please try again or message us.", 500);
     }
-  },
-};
+}

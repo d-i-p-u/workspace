@@ -13,7 +13,9 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // These go to the Worker first: SEO pages (live titles + structured data), sitemap, and the API.
+    "run_worker_first": ["/", "/index.html", "/p/*", "/sitemap.xml", "/api/*", "/img/u/*"]
   },
   "d1_databases": [
     {
