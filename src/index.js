@@ -1006,6 +1006,17 @@ async function handle(request, env, ctx, url) {
         await saveProduct(env, id, value, true);
         return json({ ok: true, product: await getProduct(env, id) });
       }
+      // Product order on the website (admin drag / arrows): ids in the new order
+      if (pathname === "/api/admin/products/order" && method === "POST") {
+        const b = await request.json().catch(() => ({}));
+        const all = (await env.DB.prepare("SELECT id FROM products ORDER BY sort, created_at").all()).results.map((r) => r.id);
+        const known = new Set(all);
+        const ids = [...new Set((Array.isArray(b.ids) ? b.ids : []).map((x) => String(x)).filter((x) => known.has(x)))];
+        if (!ids.length) return bad("No products to order");
+        const order = [...ids, ...all.filter((x) => !ids.includes(x))]; // anything not sent keeps its place at the end
+        await env.DB.batch(order.map((id, i) => env.DB.prepare("UPDATE products SET sort = ?1 WHERE id = ?2").bind(i + 1, id)));
+        return json({ ok: true, order });
+      }
       m = pathname.match(/^\/api\/admin\/products\/([a-z0-9-]+)$/);
       if (m && method === "PUT") {
         const existing = await getProduct(env, m[1]);

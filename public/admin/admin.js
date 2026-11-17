@@ -173,7 +173,13 @@
       $("#plist").innerHTML = list.length ? list.map((p) => {
         const img0 = p.variants[0]?.images[0];
         const tags = [!p.active ? `<span class="tag hid">Hidden</span>` : "", p.stock === 0 ? `<span class="tag out">Sold out</span>` : p.stock > 0 && p.stock <= 5 ? `<span class="tag low">Low stock</span>` : "", p.salePrice ? `<span class="tag">−${Math.round(((p.price - p.salePrice) / p.price) * 100)}%</span>` : ""].join("");
-        return `<div class="pitem ${p.active ? "" : "off"}" data-pid="${esc(p.id)}">
+        const pos = PRODUCTS.indexOf(p);
+        return `<div class="pitem ${p.active ? "" : "off"}" data-pid="${esc(p.id)}" draggable="true">
+          <div class="order" title="Position on the website. Drag, use the arrows, or type a number.">
+            <button type="button" class="ob" data-move="-1" aria-label="Move up" ${pos === 0 ? "disabled" : ""}>▲</button>
+            <input type="number" class="opos" min="1" max="${PRODUCTS.length}" value="${pos + 1}" aria-label="Position" data-pos>
+            <button type="button" class="ob" data-move="1" aria-label="Move down" ${pos === PRODUCTS.length - 1 ? "disabled" : ""}>▼</button>
+          </div>
           <img src="${imgUrl(img0, true)}" alt="" loading="lazy">
           <div><h4>${esc(p.name)} ${tags}</h4>
             <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.salePrice ? `<s>${tk(p.price)}</s> <b style="color:#ff6b7d">${tk(p.salePrice)}</b>` : `<b>${priceRange(p)}</b>`}${typeof p.cost === "number" ? ` · <span class="muted">buy ${tk(p.cost)} · profit ${tk((p.salePrice || p.price) - p.cost)}</span>` : ""}</div></div>
@@ -187,7 +193,61 @@
     }
     $("#pq").oninput = renderProducts;
     $("#pcat").onchange = renderProducts;
+    /* ---- product order on the website ---- */
+    let orderTimer = null;
+    function moveProduct(id, to) {
+      const from = PRODUCTS.findIndex((p) => p.id === id);
+      to = Math.max(0, Math.min(PRODUCTS.length - 1, to));
+      if (from < 0 || from === to) return;
+      const [p] = PRODUCTS.splice(from, 1);
+      PRODUCTS.splice(to, 0, p);
+      renderProducts();
+      const el = $(`#plist [data-pid="${CSS.escape(id)}"]`);
+      if (el) { el.classList.add("moved"); setTimeout(() => el.classList.remove("moved"), 700); }
+      clearTimeout(orderTimer);
+      orderTimer = setTimeout(saveOrder, 500);
+    }
+    async function saveOrder() {
+      try { await api("/api/admin/products/order", { method: "POST", body: JSON.stringify({ ids: PRODUCTS.map((p) => p.id) }) }); toast("Order saved. Live on the website."); }
+      catch (ex) { toast(ex.message, true); loadProducts(); }
+    }
+    // arrows: move past the next product that is visible in the current search/category filter
+    $("#plist").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-move]"); if (!b) return;
+      const id = b.closest("[data-pid]").dataset.pid, dir = +b.dataset.move;
+      const visible = [...$$("#plist [data-pid]")].map((x) => x.dataset.pid);
+      const neighbour = visible[visible.indexOf(id) + dir];
+      moveProduct(id, neighbour ? PRODUCTS.findIndex((p) => p.id === neighbour) : PRODUCTS.findIndex((p) => p.id === id) + dir);
+    });
+    // drag and drop (computer)
+    let dragId = null;
+    $("#plist").addEventListener("dragstart", (e) => {
+      const it = e.target.closest("[data-pid]");
+      if (!it || e.target.closest("input, button, label")) { e.preventDefault(); return; }
+      dragId = it.dataset.pid; it.classList.add("dragging"); e.dataTransfer.effectAllowed = "move";
+    });
+    $("#plist").addEventListener("dragover", (e) => {
+      if (!dragId) return; e.preventDefault();
+      $$("#plist .drop-before, #plist .drop-after").forEach((x) => x.classList.remove("drop-before", "drop-after"));
+      const it = e.target.closest("[data-pid]"); if (!it || it.dataset.pid === dragId) return;
+      const r = it.getBoundingClientRect();
+      it.classList.add(e.clientY < r.top + r.height / 2 ? "drop-before" : "drop-after");
+    });
+    $("#plist").addEventListener("drop", (e) => {
+      e.preventDefault();
+      const it = e.target.closest("[data-pid]");
+      if (dragId && it && it.dataset.pid !== dragId) {
+        const after = it.classList.contains("drop-after");
+        const from = PRODUCTS.findIndex((p) => p.id === dragId);
+        let to = PRODUCTS.findIndex((p) => p.id === it.dataset.pid) + (after ? 1 : 0);
+        if (from < to) to -= 1;
+        moveProduct(dragId, to);
+      }
+    });
+    $("#plist").addEventListener("dragend", () => { dragId = null; $$("#plist .dragging, #plist .drop-before, #plist .drop-after").forEach((x) => x.classList.remove("dragging", "drop-before", "drop-after")); });
     $("#plist").addEventListener("change", async (e) => {
+      const posInp = e.target.closest("[data-pos]");
+      if (posInp) { moveProduct(posInp.closest("[data-pid]").dataset.pid, (parseInt(posInp.value, 10) || 1) - 1); return; }
       const inp = e.target.closest("[data-f]"); if (!inp) return;
       const id = inp.closest("[data-pid]").dataset.pid;
       const f = inp.dataset.f;
