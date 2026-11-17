@@ -91,7 +91,8 @@
     fieldset { border: 1px solid var(--line); padding: 12px; margin: 0; display: grid; gap: 12px; }
     legend { padding: 0 6px; font: 700 11px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
     .colour { border: 1px solid var(--line); background: var(--ink-2); padding: 12px; display: grid; gap: 10px; }
-    .colour__top { display: grid; grid-template-columns: 1fr 70px 120px auto; gap: 8px; align-items: end; }
+    .colour__top { display: grid; grid-template-columns: 1fr 70px 110px 100px auto; gap: 8px; align-items: end; }
+    input.ro { opacity: .75; cursor: not-allowed; }
     .colour__top input[type=color] { padding: 2px; height: 38px; }
     .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
     .thumb { position: relative; width: 84px; height: 84px; border: 1px solid var(--line); background: #f5f4f2; }
@@ -126,7 +127,7 @@
       .pitem .ctl { grid-column: 1 / -1; justify-content: flex-start; }
       .grid2, .grid3 { grid-template-columns: 1fr; }
       .colour__top { grid-template-columns: 1fr 60px; }
-      .colour__top .vprice, .colour__top .vdel { grid-column: span 1; }
+      .colour__top .vprice, .colour__top .vstock, .colour__top .vdel { grid-column: span 1; }
       .cat { grid-template-columns: 1fr; }
     }
   </style>
@@ -252,7 +253,7 @@
           <label>Old price <small>shows as a sale</small><input name="compareAt" type="number" min="0" step="10" placeholder="optional"></label>
         </div>
         <div class="grid3">
-          <label>Stock <small>empty = unlimited</small><input name="stock" type="number" min="0" step="1" placeholder="unlimited"></label>
+          <label>Stock <small id="stockHint">empty = unlimited</small><input name="stock" type="number" min="0" step="1" placeholder="unlimited"></label>
           <label>Badge <small>e.g. New, Hot</small><input name="badge" maxlength="24"></label>
           <label style="align-content:end"><span style="display:flex;gap:8px;align-items:center"><span class="switch"><input type="checkbox" name="active" checked><span></span></span> Show on website</span></label>
         </div>

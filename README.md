@@ -112,6 +112,14 @@ prices, colours, images and delivery charges. Edit it on GitHub (open the file �
 - নতুন অর্ডার এলে সেটা Excel-এ আসে। Excel-এ **Data → From Web**-এ গিয়ে admin পেজের লিংকটা দিন, তাহলে প্রতি ৫ মিনিটে নিজে থেকেই আপডেট হবে।
 - দাম বদলাতে চাইলে `public/data/products.json` ফাইলে দাম এডিট করুন।
 
+## Stock per colour
+
+In **Admin → Products → Edit**, each colour has its own **Stock** box (empty = unlimited).
+When any colour has a number, the product counts stock per colour: an order lowers only that colour,
+a cancelled or returned order puts it back, and the product's total stock is the sum of its colours
+(shown read-only in the products list). A colour at 0 shows as sold out on the website; 5 or fewer shows "Only N left".
+Products with no colour numbers keep using the single product Stock box.
+
 ## Security
 
 - Security headers on every response: HSTS, CSP (`script-src 'self'`), X-Frame-Options DENY, nosniff,

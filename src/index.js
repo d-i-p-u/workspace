@@ -179,6 +179,10 @@ function rowToProduct(r) {
     updated_at: r.updated_at || "",
   };
 }
+// Stock per colour: a product tracks stock per colour when any colour has a number.
+// Its total is the sum of its colours, or null (unlimited) if any colour is unlimited.
+const hasColourStock = (variants) => (variants || []).some((v) => typeof v.stock === "number");
+const colourTotal = (variants) => (variants.every((v) => typeof v.stock === "number") ? variants.reduce((s, v) => s + v.stock, 0) : null);
 function safeJSON(s, d) {
   try {
     return s ? JSON.parse(s) : d;
@@ -257,9 +261,19 @@ export function priceOrder(items, zone, cat) {
     if (!sizes.has(it.size)) throw new Error(`Pick a size for ${product.name}.`);
     const qty = Math.trunc(Number(it.qty));
     if (!(qty >= 1 && qty <= 10)) throw new Error("Quantity must be 1–10.");
-    wanted.set(product.id, (wanted.get(product.id) || 0) + qty);
-    if (product.stock !== null && product.stock !== undefined && wanted.get(product.id) > product.stock) {
-      throw new Error(product.stock > 0 ? `Only ${product.stock} left of ${product.name}.` : `${product.name} is sold out.`);
+    if (hasColourStock(product.variants)) {
+      const key = product.id + ":" + variant.id;
+      wanted.set(key, (wanted.get(key) || 0) + qty);
+      if (typeof variant.stock === "number" && wanted.get(key) > variant.stock) {
+        throw new Error(
+          variant.stock > 0 ? `Only ${variant.stock} left of ${product.name} in ${variant.name}.` : `${product.name} (${variant.name}) is sold out.`
+        );
+      }
+    } else {
+      wanted.set(product.id, (wanted.get(product.id) || 0) + qty);
+      if (product.stock !== null && product.stock !== undefined && wanted.get(product.id) > product.stock) {
+        throw new Error(product.stock > 0 ? `Only ${product.stock} left of ${product.name}.` : `${product.name} is sold out.`);
+      }
     }
     const unit = variant.price ?? product.price;
     return {
@@ -280,12 +294,34 @@ export function priceOrder(items, zone, cat) {
 }
 
 async function adjustStock(env, lines, sign) {
-  const stmts = lines.map((l) =>
-    env.DB.prepare("UPDATE products SET stock = MAX(stock + ?1, 0), updated_at = datetime('now') WHERE id = ?2 AND stock IS NOT NULL").bind(
-      sign * l.qty,
-      l.productId
-    )
-  );
+  if (!lines.length) return;
+  const ids = [...new Set(lines.map((l) => l.productId))];
+  const rows = await env.DB.prepare(`SELECT id, variants FROM products WHERE id IN (${ids.map((_, i) => "?" + (i + 1)).join(",")})`)
+    .bind(...ids)
+    .all();
+  const byId = new Map((rows.results || []).map((r) => [r.id, safeJSON(r.variants, [])]));
+  const stmts = [];
+  const perColour = new Map();
+  for (const l of lines) {
+    const vs = byId.get(l.productId);
+    if (vs && hasColourStock(vs)) {
+      const v = vs.find((x) => x.id === l.variantId);
+      if (v && typeof v.stock === "number") v.stock = Math.max(v.stock + sign * l.qty, 0);
+      perColour.set(l.productId, vs);
+    } else {
+      stmts.push(
+        env.DB.prepare("UPDATE products SET stock = MAX(stock + ?1, 0), updated_at = datetime('now') WHERE id = ?2 AND stock IS NOT NULL").bind(
+          sign * l.qty,
+          l.productId
+        )
+      );
+    }
+  }
+  for (const [id, vs] of perColour) {
+    stmts.push(
+      env.DB.prepare("UPDATE products SET variants = ?1, stock = ?2, updated_at = datetime('now') WHERE id = ?3").bind(JSON.stringify(vs), colourTotal(vs), id)
+    );
+  }
   if (stmts.length) await env.DB.batch(stmts);
 }
 
@@ -467,11 +503,14 @@ function readProductInput(b, existing = {}) {
       while (seen.has(id)) id += "-2";
       seen.add(id);
       const vp = v.price === "" || v.price === undefined || v.price === null ? undefined : int(v.price);
+      const vs = int(v.stock);
+      if (vs !== null && (Number.isNaN(vs) || vs < 0 || vs > 100000)) errors.push(`Stock for ${vname || "a colour"} must be 0 or more (or empty for unlimited).`);
       return {
         id,
         name: vname || "Default",
         swatch: /^#[0-9a-f]{6}$/i.test(v.swatch || "") ? v.swatch : "#141414",
         ...(vp && vp > 0 ? { price: vp } : {}),
+        ...(vs !== null && vs >= 0 ? { stock: vs } : {}),
         images: (Array.isArray(v.images) ? v.images : []).map((x) => clean(x, 80)).filter((x) => SAFE_IMAGE.test(x)).slice(0, 8),
       };
     })
@@ -494,7 +533,7 @@ function readProductInput(b, existing = {}) {
       description: clean(b.description ?? existing.description, 1200),
       details: JSON.stringify(b.details !== undefined ? details : existing.details || []),
       variants: JSON.stringify(variants),
-      stock,
+      stock: hasColourStock(variants) ? colourTotal(variants) : stock,
       active: b.active === undefined ? (existing.active === false ? 0 : 1) : b.active === false || b.active === "false" || b.active === 0 ? 0 : 1,
     },
   };
@@ -549,13 +588,16 @@ async function patchProduct(env, id, body) {
   if (body.stock !== undefined) {
     const n = int(body.stock);
     if (n !== null && (Number.isNaN(n) || n < 0)) return bad("Stock must be 0 or more (empty = unlimited)");
-    sets.push(`stock = ?${args.push(n)}`);
+    if (hasColourStock(p.variants)) {
+      // the total is the sum of the colours; it can only be changed per colour
+      if (n !== p.stock) return bad("This product has stock per colour. Change it in Admin → Products → Edit.");
+    } else sets.push(`stock = ?${args.push(n)}`);
   }
   if (body.active !== undefined) {
     const v = String(body.active).trim().toLowerCase();
     sets.push(`active = ?${args.push(["false", "no", "0", "hide", "hidden", "off"].includes(v) ? 0 : 1)}`);
   }
-  if (!sets.length) return bad("Nothing to update");
+  if (!sets.length) return body.stock !== undefined ? json({ ok: true, product: p }) : bad("Nothing to update");
   await env.DB.prepare(`UPDATE products SET ${sets.join(", ")}, updated_at = datetime('now') WHERE id = ?${args.push(id)}`)
     .bind(...args)
     .run();
@@ -630,7 +672,9 @@ async function sheetData(env, url) {
     compare_at: p.compareAt ?? "",
     stock: p.stock ?? "",
     active: p.active,
-    colors: p.variants.map((v) => v.name + (v.price && v.price !== p.price ? ` (৳${v.price})` : "")).join(", "),
+    colors: p.variants
+      .map((v) => v.name + (v.price && v.price !== p.price ? ` (৳${v.price})` : "") + (typeof v.stock === "number" ? ` [${v.stock} left]` : ""))
+      .join(", "),
     url: `https://oddkult.com/#p-${p.id}`,
     updated_bd: p.updated_at ? toBangladeshTime(p.updated_at) : "",
   }));

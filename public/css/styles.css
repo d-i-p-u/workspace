@@ -240,6 +240,7 @@ section { padding: clamp(56px, 9vw, 120px) var(--gutter); }
 .colors, .sizes { display: flex; gap: 8px; flex-wrap: wrap; }
 .color-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 14px 0 8px; border: 1px solid var(--line); border-radius: 40px; font-size: .88rem; }
 .color-btn .sw { width: 22px; height: 22px; }
+.color-btn.is-out { opacity: .5; text-decoration: line-through; }
 .color-btn.is-active, .size-btn.is-active { border-color: var(--bone); background: rgba(237,234,228,.08); }
 .size-btn { min-width: 56px; min-height: 46px; padding: 0 14px; border: 1px solid var(--line); font: 700 .8rem var(--f-mono); letter-spacing: .06em; }
 .size-btn small { display: block; font-weight: 400; font-size: .64rem; color: var(--muted); }

@@ -36,6 +36,9 @@ const variantPrice = (p, v) => v.price ?? p.price;
 const minPrice = (p) => Math.min(...p.variants.map((v) => variantPrice(p, v)));
 const soldOut = (p) => p.stock === 0;
 const lowStock = (p) => typeof p.stock === "number" && p.stock > 0 && p.stock <= 5;
+// Stock of one colour: products can track stock per colour; otherwise the product stock applies.
+const perColour = (p) => p.variants.some((v) => typeof v.stock === "number");
+const stockOf = (p, v) => (perColour(p) ? (typeof v.stock === "number" ? v.stock : null) : p.stock ?? null);
 const store = () => ({ ...CONFIG, ...((DATA && DATA.store) || {}) });
 
 // ---------- Grid ----------
@@ -130,7 +133,7 @@ function setFilter(f) {
 function openProduct(id, variantId) {
   const p = product(id);
   if (!p) return;
-  let v = p.variants.find((x) => x.id === variantId) || p.variants[0];
+  let v = p.variants.find((x) => x.id === variantId) || p.variants.find((x) => stockOf(p, x) !== 0) || p.variants[0];
   let size = null, qty = 1, imgIdx = 0;
   const box = $("[data-pdp]");
   const body = $("[data-pdp-body]");
@@ -139,6 +142,9 @@ function openProduct(id, variantId) {
 
   const draw = () => {
     const images = v.images;
+    const left = stockOf(p, v);
+    const out = left === 0;
+    const colourNote = perColour(p) && p.variants.length > 1 ? ` in ${esc(v.name)}` : "";
     body.innerHTML = `
       <div class="pdp__gallery">
         <img class="pdp__main" src="${img(images[imgIdx])}" alt="${esc(p.name)} ${esc(p.type)} — ${esc(v.name)}" width="1200" height="1200">
@@ -152,10 +158,10 @@ function openProduct(id, variantId) {
           <p class="pdp__type">${esc(p.type)} — ${esc(p.tagline)}</p>
         </div>
         <div class="pdp__price">${p.compareAt ? `<s>${tk(p.compareAt)}</s>` : ""}${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
-        ${soldOut(p) ? `<p class="pdp__stock pdp__stock--out">Sold out. Message us on WhatsApp to get notified when it's back.</p>` : lowStock(p) ? `<p class="pdp__stock">Only ${p.stock} left</p>` : ""}
+        ${out ? `<p class="pdp__stock pdp__stock--out">${soldOut(p) ? "Sold out" : `${esc(v.name)} is sold out. Pick another colour`}. Message us on WhatsApp to get notified when it's back.</p>` : left > 0 && left <= 5 ? `<p class="pdp__stock">Only ${left} left${colourNote}</p>` : ""}
         <div>
           <div class="opt-label mono"><span>Colour</span><span>${esc(v.name)}</span></div>
-          <div class="colors">${p.variants.map((x) => `<button class="color-btn ${x.id === v.id ? "is-active" : ""}" data-variant="${x.id}"><span class="sw" style="background:${x.swatch}"></span>${esc(x.name)}</button>`).join("")}</div>
+          <div class="colors">${p.variants.map((x) => `<button class="color-btn ${x.id === v.id ? "is-active" : ""} ${stockOf(p, x) === 0 ? "is-out" : ""}" data-variant="${x.id}"${stockOf(p, x) === 0 ? ' title="Sold out"' : ""}><span class="sw" style="background:${x.swatch}"></span>${esc(x.name)}</button>`).join("")}</div>
         </div>
         <div>
           <div class="opt-label mono"><span>Waist size</span><a href="#faq" data-close-pdp class="muted">Size guide</a></div>
@@ -163,7 +169,7 @@ function openProduct(id, variantId) {
         </div>
         <div class="pdp__buy">
           <div class="qty"><button data-qty="-1" aria-label="Less">−</button><output>${qty}</output><button data-qty="1" aria-label="More">+</button></div>
-          ${soldOut(p)
+          ${out
             ? `<button class="btn btn--ghost" disabled>Sold out</button>`
             : `<button class="btn btn--chrome" data-add>Add to bag · ${tk(variantPrice(p, v) * qty)}</button>`}
         </div>
@@ -180,12 +186,12 @@ function openProduct(id, variantId) {
   body.onclick = (e) => {
     const t = e.target.closest("button, a");
     if (!t) return;
-    if (t.dataset.variant) { v = p.variants.find((x) => x.id === t.dataset.variant); imgIdx = 0; draw(); }
+    if (t.dataset.variant) { v = p.variants.find((x) => x.id === t.dataset.variant); imgIdx = 0; const l = stockOf(p, v); if (typeof l === "number" && l > 0) qty = Math.min(qty, l); draw(); }
     else if (t.dataset.img) { imgIdx = +t.dataset.img; draw(); }
     else if (t.dataset.size) { size = t.dataset.size; draw(); }
-    else if (t.dataset.qty) { qty = Math.min(10, typeof p.stock === "number" ? Math.max(p.stock, 1) : 10, Math.max(1, qty + +t.dataset.qty)); draw(); }
+    else if (t.dataset.qty) { const l = stockOf(p, v); qty = Math.min(10, typeof l === "number" ? Math.max(l, 1) : 10, Math.max(1, qty + +t.dataset.qty)); draw(); }
     else if ("add" in t.dataset) {
-      if (soldOut(p)) return;
+      if (stockOf(p, v) === 0) return;
       if (!size) { toast("Pick your waist size first"); $(".sizes", body).animate([{ transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "none" }], { duration: 300 }); return; }
       addToCart(p.id, v.id, size, qty);
       closeProduct();
@@ -477,7 +483,7 @@ async function init() {
     return;
   }
   // drop cart lines for products that no longer exist or are sold out
-  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId) && !soldOut(product(l.productId)));
+  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId && stockOf(product(l.productId), v) !== 0) && !soldOut(product(l.productId)));
   renderSocials();
   renderDeliveryCopy();
   renderCollections();
