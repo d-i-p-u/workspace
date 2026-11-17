@@ -246,7 +246,7 @@
         <div class="colour__top">
           <label>Colour name <input data-c="name" value="${esc(c.name)}" maxlength="40" placeholder="e.g. Black"></label>
           <label>Swatch <input type="color" data-c="swatch" value="${esc(c.swatch)}"></label>
-          <label class="vprice">Price ৳ <small>empty = main</small><input type="number" data-c="price" value="${esc(c.price)}" min="50" step="10" placeholder="${esc($("#pform").price.value || "same")}"></label>
+          <label class="vprice">Regular ৳ <small class="pays">${paysText(c)}</small><input type="number" data-c="price" value="${esc(c.price)}" min="50" step="10" placeholder="${esc($("#pform").price.value || "same")}"></label>
           <label class="vstock">Stock <small>${c.stock === "" || c.stock === undefined ? "∞" : +c.stock === 0 ? "sold out" : +c.stock <= 5 ? "low" : "in stock"}</small><input type="number" data-c="stock" value="${esc(c.stock ?? "")}" min="0" step="1" placeholder="∞"></label>
           <label class="vcost">Buying ৳ <small>private</small><input type="number" data-c="cost" value="${esc(c.cost ?? "")}" min="0" step="1" placeholder="${esc($("#pform").cost.value || "—")}"></label>
           <button type="button" class="btn sm danger vdel" data-cdel ${COLOURS.length === 1 ? "disabled" : ""}>Remove</button>
@@ -277,7 +277,20 @@
       out.textContent = (lo === hi ? tk(lo) : `${tk(lo)} – ${tk(hi)}`) + (lo === hi ? ` (${Math.round((lo / base) * 100)}%)` : "") + (known.length < ps.length ? " · some colours missing" : "");
       out.className = lo < 0 ? "neg" : "pos";
     }
-    $("#pform").salePrice.addEventListener("input", showProfit);
+    // What the customer pays for a colour: its regular price minus the product's discount amount
+    function discountOff() {
+      const f = $("#pform"), regular = +f.price.value || 0, sale = +f.salePrice.value || 0;
+      return sale && sale < regular ? regular - sale : 0;
+    }
+    function paysText(c) {
+      const off = discountOff();
+      if (!off) return "empty = main";
+      const regular = c.price !== "" && c.price !== undefined ? +c.price : +$("#pform").price.value || 0;
+      return `pays ${tk(Math.max(regular - off, 1))}`;
+    }
+    function refreshPays() { $$("#colours [data-ci]").forEach((box) => { const el = box.querySelector(".pays"); if (el) el.textContent = paysText(COLOURS[+box.dataset.ci]); }); }
+    $("#pform").salePrice.addEventListener("input", () => { showProfit(); refreshPays(); });
+    $("#pform").price.addEventListener("input", refreshPays);
     /* ---- waist sizes (same for every colour) ---- */
     const STD_SIZES = [{ from: 28, to: 30 }, { from: 32, to: 34 }, { from: 36, to: 38 }, { from: 40, to: 42 }];
     let SIZES = [];
@@ -296,6 +309,7 @@
       const el = e.target.closest("[data-c]"); if (!el) return;
       COLOURS[+el.closest("[data-ci]").dataset.ci][el.dataset.c] = el.value;
       if (el.dataset.c === "price" || el.dataset.c === "cost") showProfit();
+      if (el.dataset.c === "price") refreshPays();
       if (el.dataset.c === "stock") {
         const sm = el.closest("label").querySelector("small");
         sm.textContent = el.value === "" ? "∞" : +el.value === 0 ? "sold out" : +el.value <= 5 ? "low" : "in stock";
@@ -354,6 +368,10 @@
         variants: COLOURS.map((c) => ({ id: c.id, name: c.name, swatch: c.swatch, price: c.price, stock: c.stock, cost: c.cost, images: c.images })),
       };
       if (!body.sizes.length) { $("#perr").textContent = "Add at least one waist size."; return; }
+      // Common mistake: typing the discount price into a colour's price box (the discount would then apply twice)
+      const sale = +f.salePrice.value || 0;
+      const low = sale ? COLOURS.filter((c) => c.price !== "" && +c.price <= sale) : [];
+      if (low.length && !confirm(`${low.map((c) => c.name || "A colour").join(", ")}: the colour price box is the REGULAR price for that colour, and the discount is taken off automatically.\n\nWith these numbers the customer pays ${low.map((c) => `${c.name}: ${paysText(c).replace("pays ", "")}`).join(", ")}.\n\nTip: leave the colour price empty to use the main price.\n\nSave anyway?`)) return;
       if (COLOURS.some((c) => !c.images.length)) { $("#perr").textContent = "Every colour needs at least one photo (or remove the colour)."; return; }
       const btn = $("#saveProduct"); btn.disabled = true; btn.textContent = "Saving…";
       try {
