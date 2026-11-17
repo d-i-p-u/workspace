@@ -120,6 +120,13 @@ a cancelled or returned order puts it back, and the product's total stock is the
 (shown read-only in the products list). A colour at 0 shows as sold out on the website; 5 or fewer shows "Only N left".
 Products with no colour numbers keep using the single product Stock box.
 
+## Buying prices and profit
+
+Each product has a private **Buying price** (and each colour can have its own). It is never sent to the
+website. Every order saves the buying price at the time of sale, so later changes don't rewrite old profit.
+The Google Sheet and Excel export show **Buying cost** and **Profit** (subtotal minus buying cost) per order;
+cancelled and returned orders count as 0. The Products tab shows buying price, profit per unit and margin %.
+
 ## Security
 
 - Security headers on every response: HSTS, CSP (`script-src 'self'`), X-Frame-Options DENY, nosniff,

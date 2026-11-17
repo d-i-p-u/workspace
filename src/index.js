@@ -132,6 +132,8 @@ async function seedOnce(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, content_type TEXT NOT NULL, data BLOB NOT NULL, created_at TEXT)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS rate_limits (k TEXT PRIMARY KEY, n INTEGER NOT NULL, reset INTEGER NOT NULL)"),
   ]);
+  // Buying price (private: admin and Google Sheet only)
+  await env.DB.prepare("ALTER TABLE products ADD COLUMN cost INTEGER").run().catch(() => {});
   const done = await env.DB.prepare("SELECT value FROM settings WHERE key = 'catalogue_seeded'").first();
   if (done) return;
   const overrides = new Map();
@@ -174,6 +176,7 @@ function rowToProduct(r) {
     details: safeJSON(r.details, []),
     variants: safeJSON(r.variants, []),
     stock: r.stock ?? null,
+    cost: r.cost ?? null,
     active: r.active !== 0,
     sort: r.sort ?? 0,
     updated_at: r.updated_at || "",
@@ -181,7 +184,13 @@ function rowToProduct(r) {
 }
 // Stock per colour: a product tracks stock per colour when any colour has a number.
 // Its total is the sum of its colours, or null (unlimited) if any colour is unlimited.
-const hasColourStock = (variants) => (variants || []).some((v) => typeof v.stock === "number");
+// Buying prices never leave the admin: strip them from anything public.
+function publicProduct(p) {
+  const { cost, ...rest } = p;
+  return { ...rest, variants: (p.variants || []).map(({ cost, ...v }) => v) };
+}
+const unitCost = (p, v) => (typeof v?.cost === "number" ? v.cost : typeof p?.cost === "number" ? p.cost : null);
+const hasColourStock =(variants) => (variants || []).some((v) => typeof v.stock === "number");
 const colourTotal = (variants) => (variants.every((v) => typeof v.stock === "number") ? variants.reduce((s, v) => s + v.stock, 0) : null);
 function safeJSON(s, d) {
   try {
@@ -243,7 +252,7 @@ export async function getCatalog(env, opts = {}) {
       announcement: settings.announcement,
     },
     collections,
-    products,
+    products: opts.withCost ? products : products.map(publicProduct),
   };
 }
 
@@ -285,6 +294,7 @@ export function priceOrder(items, zone, cat) {
       qty,
       unit,
       total: unit * qty,
+      cost: unitCost(product, variant), // buying price per unit at the time of the order
     };
   });
   const subtotal = lines.reduce((s, l) => s + l.total, 0);
@@ -362,7 +372,7 @@ async function createOrder(request, env, ctx) {
 
   let priced;
   try {
-    priced = priceOrder(body.items, zone, await getCatalog(env));
+    priced = priceOrder(body.items, zone, await getCatalog(env, { withCost: true }));
   } catch (e) {
     return bad(e.message);
   }
@@ -425,6 +435,8 @@ const COLUMNS = [
   ["note", "Customer note"],
   ["admin_note", "Admin note"],
   ["updated_bd", "Last updated"],
+  ["cost", "Buying cost (BDT)"],
+  ["profit", "Profit (BDT)"],
 ];
 
 async function listOrders(env, url) {
@@ -434,15 +446,34 @@ async function listOrders(env, url) {
     status && STATUSES.includes(status)
       ? env.DB.prepare("SELECT * FROM orders WHERE status = ?1 ORDER BY created_at DESC LIMIT ?2").bind(status, limit)
       : env.DB.prepare("SELECT * FROM orders ORDER BY created_at DESC LIMIT ?1").bind(limit);
-  const { results } = await q.all();
+  const [{ results }, products] = await Promise.all([q.all(), loadProducts(env, { includeHidden: true })]);
+  const byId = new Map(products.map((p) => [p.id, p]));
   return results.map((r) => ({
     ...r,
+    ...orderFinance(r, byId),
     created_bd: toBangladeshTime(r.created_at),
     updated_bd: r.updated_at ? toBangladeshTime(r.updated_at) : "",
     admin_note: r.admin_note || "",
     zone: r.zone === "inside" ? "Inside Dhaka" : "Outside Dhaka",
     items: safeJSON(r.items_json, []),
   }));
+}
+
+// Buying cost and profit of an order. Uses the buying price saved with the order;
+// older orders fall back to the product's current buying price. Cancelled/returned = 0.
+function orderFinance(r, byId) {
+  if (INACTIVE.has(r.status)) return { cost: 0, profit: 0 };
+  let cost = 0;
+  for (const l of safeJSON(r.items_json, [])) {
+    let c = typeof l.cost === "number" ? l.cost : null;
+    if (c === null) {
+      const p = byId.get(l.productId);
+      c = p ? unitCost(p, p.variants.find((v) => v.id === l.variantId)) : null;
+    }
+    if (c === null) return { cost: "", profit: "" }; // a buying price is missing
+    cost += c * (l.qty || 0);
+  }
+  return { cost, profit: (r.subtotal || 0) - cost };
 }
 
 async function updateOrder(env, id, body) {
@@ -492,6 +523,8 @@ function readProductInput(b, existing = {}) {
   if (!(price >= 50 && price <= 100000)) errors.push("Price must be between 50 and 100000.");
   const compareAt = b.compareAt !== undefined ? int(b.compareAt) : existing.compareAt ?? null;
   if (compareAt !== null && (Number.isNaN(compareAt) || compareAt <= price)) errors.push("Old price must be higher than the price (or empty).");
+  const cost = b.cost !== undefined ? int(b.cost) : existing.cost ?? null;
+  if (cost !== null && (Number.isNaN(cost) || cost < 0 || cost > 100000)) errors.push("Buying price must be 0–100000 (or empty).");
   const stock = b.stock !== undefined ? int(b.stock) : existing.stock ?? null;
   if (stock !== null && (Number.isNaN(stock) || stock < 0)) errors.push("Stock must be 0 or more (or empty for unlimited).");
   const variantsIn = Array.isArray(b.variants) ? b.variants : existing.variants || [];
@@ -504,6 +537,8 @@ function readProductInput(b, existing = {}) {
       seen.add(id);
       const vp = v.price === "" || v.price === undefined || v.price === null ? undefined : int(v.price);
       if (vp !== undefined && !(vp >= 50 && vp <= 100000)) errors.push(`Price for ${vname || "a colour"} must be between 50 and 100000 (or empty for the main price).`);
+      const vc = int(v.cost);
+      if (vc !== null && (Number.isNaN(vc) || vc < 0 || vc > 100000)) errors.push(`Buying price for ${vname || "a colour"} must be 0–100000 (or empty).`);
       const vs = int(v.stock);
       if (vs !== null && (Number.isNaN(vs) || vs < 0 || vs > 100000)) errors.push(`Stock for ${vname || "a colour"} must be 0 or more (or empty for unlimited).`);
       return {
@@ -512,6 +547,7 @@ function readProductInput(b, existing = {}) {
         swatch: /^#[0-9a-f]{6}$/i.test(v.swatch || "") ? v.swatch : "#141414",
         ...(vp >= 50 && vp <= 100000 && vp !== price ? { price: vp } : {}),
         ...(vs !== null && vs >= 0 ? { stock: vs } : {}),
+        ...(vc !== null && vc >= 0 && vc <= 100000 && vc !== cost ? { cost: vc } : {}),
         images: (Array.isArray(v.images) ? v.images : []).map((x) => clean(x, 80)).filter((x) => SAFE_IMAGE.test(x)).slice(0, 8),
       };
     })
@@ -535,6 +571,7 @@ function readProductInput(b, existing = {}) {
       details: JSON.stringify(b.details !== undefined ? details : existing.details || []),
       variants: JSON.stringify(variants),
       stock: hasColourStock(variants) ? colourTotal(variants) : stock,
+      cost,
       active: b.active === undefined ? (existing.active === false ? 0 : 1) : b.active === false || b.active === "false" || b.active === 0 ? 0 : 1,
     },
   };
@@ -544,17 +581,17 @@ async function saveProduct(env, id, v, isNew) {
   if (isNew) {
     const maxSort = await env.DB.prepare("SELECT COALESCE(MAX(sort), 0) AS s FROM products").first();
     await env.DB.prepare(
-      `INSERT INTO products (id, name, type, collection, price, compare_at, badge, tagline, description, details, variants, stock, active, sort, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, datetime('now'), datetime('now'))`
+      `INSERT INTO products (id, name, type, collection, price, compare_at, badge, tagline, description, details, variants, stock, active, sort, cost, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, datetime('now'), datetime('now'))`
     )
-      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, (maxSort?.s || 0) + 1)
+      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, (maxSort?.s || 0) + 1, v.cost)
       .run();
   } else {
     await env.DB.prepare(
       `UPDATE products SET name=?2, type=?3, collection=?4, price=?5, compare_at=?6, badge=?7, tagline=?8, description=?9,
-       details=?10, variants=?11, stock=?12, active=?13, updated_at=datetime('now') WHERE id=?1`
+       details=?10, variants=?11, stock=?12, active=?13, cost=?14, updated_at=datetime('now') WHERE id=?1`
     )
-      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active)
+      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, v.cost)
       .run();
   }
 }
@@ -593,6 +630,11 @@ async function patchProduct(env, id, body) {
       // the total is the sum of the colours; it can only be changed per colour
       if (n !== p.stock) return bad("This product has stock per colour. Change it in Admin → Products → Edit.");
     } else sets.push(`stock = ?${args.push(n)}`);
+  }
+  if (body.cost !== undefined) {
+    const n = int(body.cost);
+    if (n !== null && (Number.isNaN(n) || n < 0 || n > 100000)) return bad("Buying price must be 0–100000 (or empty)");
+    sets.push(`cost = ?${args.push(n)}`);
   }
   if (body.active !== undefined) {
     const v = String(body.active).trim().toLowerCase();
@@ -642,6 +684,7 @@ const SHEET_TABS = {
       ["zone", "Zone"], ["district", "District"], ["address", "Address"], ["items_summary", "Items"], ["item_count", "Qty"],
       ["subtotal", "Subtotal (BDT)"], ["delivery", "Delivery (BDT)"], ["total", "COD total (BDT)"], ["payment", "Payment"],
       ["note", "Customer note"], ["updated_bd", "Last updated", "date"],
+      ["cost", "Buying cost (BDT)"], ["profit", "Profit (BDT)"],
     ],
   },
   products: {
@@ -651,6 +694,7 @@ const SHEET_TABS = {
       ["id", "Product ID"], ["name", "Name"], ["type", "Type"], ["collection", "Collection"], ["price", "Price (BDT) ✎", "edit"],
       ["active", "Show on site ✎", "edit"], ["sold", "Units sold"], ["colors", "Colours"], ["url", "Product link"],
       ["updated_bd", "Last updated", "date"], ["compare_at", "Old price ✎", "edit"], ["stock", "Stock ✎", "edit"],
+      ["cost", "Buying price ✎", "edit"], ["margin", "Profit per unit (BDT)"], ["margin_pct", "Margin %"],
     ],
   },
 };
@@ -672,9 +716,12 @@ async function sheetData(env, url) {
     price: p.price,
     compare_at: p.compareAt ?? "",
     stock: p.stock ?? "",
+    cost: p.cost ?? "",
+    margin: typeof p.cost === "number" ? p.price - p.cost : "",
+    margin_pct: typeof p.cost === "number" && p.price ? Math.round(((p.price - p.cost) / p.price) * 100) : "",
     active: p.active,
     colors: p.variants
-      .map((v) => v.name + (v.price && v.price !== p.price ? ` (৳${v.price})` : "") + (typeof v.stock === "number" ? ` [${v.stock} left]` : ""))
+      .map((v) => v.name + (v.price && v.price !== p.price ? ` (৳${v.price})` : "") + (typeof v.cost === "number" ? ` {buy ৳${v.cost}}` : "") + (typeof v.stock === "number" ? ` [${v.stock} left]` : ""))
       .join(", "),
     url: `https://oddkult.com/#p-${p.id}`,
     updated_bd: p.updated_at ? toBangladeshTime(p.updated_at) : "",

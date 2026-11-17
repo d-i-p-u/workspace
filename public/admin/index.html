@@ -91,7 +91,13 @@
     fieldset { border: 1px solid var(--line); padding: 12px; margin: 0; display: grid; gap: 12px; }
     legend { padding: 0 6px; font: 700 11px "Space Mono", monospace; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
     .colour { border: 1px solid var(--line); background: var(--ink-2); padding: 12px; display: grid; gap: 10px; }
-    .colour__top { display: grid; grid-template-columns: 1fr 70px 110px 100px auto; gap: 8px; align-items: end; }
+    .colour__top { display: grid; grid-template-columns: 1fr 64px 100px 100px 90px auto; gap: 8px; align-items: end; }
+    .costrow { border: 1px dashed var(--line); padding: 10px 12px; }
+    .profit { display: grid; align-content: end; gap: 4px; padding-bottom: 8px; }
+    .profit small { color: var(--muted, #8a8a8a); font-size: .72rem; }
+    .profit b { font-size: 1.1rem; }
+    .profit b.neg { color: #ff6b6b; }
+    .profit b.pos { color: #7ddc8a; }
     input.ro { opacity: .75; cursor: not-allowed; }
     .colour__top input[type=color] { padding: 2px; height: 38px; }
     .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -127,7 +133,7 @@
       .pitem .ctl { grid-column: 1 / -1; justify-content: flex-start; }
       .grid2, .grid3 { grid-template-columns: 1fr; }
       .colour__top { grid-template-columns: 1fr 60px; }
-      .colour__top .vprice, .colour__top .vstock, .colour__top .vdel { grid-column: span 1; }
+      .colour__top .vprice, .colour__top .vstock, .colour__top .vcost, .colour__top .vdel { grid-column: span 1; }
       .cat { grid-template-columns: 1fr; }
     }
   </style>
@@ -251,6 +257,10 @@
           <label>Category <select name="collection" id="fcat"></select></label>
           <label>Price (BDT) * <input name="price" type="number" min="50" step="10" required></label>
           <label>Old price <small>shows as a sale</small><input name="compareAt" type="number" min="0" step="10" placeholder="optional"></label>
+        </div>
+        <div class="grid2 costrow">
+          <label>Buying price (BDT) <small>private · never shown on the website</small><input name="cost" type="number" min="0" step="1" placeholder="what you pay per piece"></label>
+          <div class="profit"><small>Profit per piece</small><b id="profitOut">—</b></div>
         </div>
         <div class="grid3">
           <label>Stock <small id="stockHint">empty = unlimited</small><input name="stock" type="number" min="0" step="1" placeholder="unlimited"></label>

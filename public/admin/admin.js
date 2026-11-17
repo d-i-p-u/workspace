@@ -176,7 +176,7 @@
         return `<div class="pitem ${p.active ? "" : "off"}" data-pid="${esc(p.id)}">
           <img src="${imgUrl(img0, true)}" alt="" loading="lazy">
           <div><h4>${esc(p.name)} ${tags}</h4>
-            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}<b>${priceRange(p)}</b></div></div>
+            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}<b>${priceRange(p)}</b>${typeof p.cost === "number" ? ` · <span class="muted">buy ${tk(p.cost)} · profit ${tk(p.price - p.cost)}</span>` : ""}</div></div>
           <div class="ctl">
             <label>Price <input type="number" min="50" step="10" value="${p.price}" data-f="price"></label>
             ${perColour(p) ? `<label title="${esc(p.variants.map((v) => `${v.name}: ${typeof v.stock === "number" ? v.stock : "∞"}`).join(" · "))}">Stock <input type="text" value="${p.stock ?? "∞"}" readonly class="ro" aria-label="Total stock (set per colour in Edit)"></label>` : `<label>Stock <input type="number" min="0" step="1" value="${p.stock ?? ""}" placeholder="∞" data-f="stock"></label>`}
@@ -228,10 +228,10 @@
       $("#perr").textContent = "";
       f.name.value = p?.name || ""; f.type.value = p?.type || "";
       f.collection.value = p?.collection || COLLECTIONS[0]?.id || "";
-      f.price.value = p?.price ?? ""; f.compareAt.value = p?.compareAt ?? ""; f.stock.value = p?.stock ?? ""; f.stock.dataset.was = p && !perColour(p) ? p.stock ?? "" : "";
+      f.price.value = p?.price ?? ""; f.compareAt.value = p?.compareAt ?? ""; f.stock.value = p?.stock ?? ""; f.stock.dataset.was = p && !perColour(p) ? p.stock ?? "" : ""; f.cost.value = p?.cost ?? "";
       f.badge.value = p?.badge || ""; f.tagline.value = p?.tagline || ""; f.description.value = p?.description || "";
       f.details.value = (p?.details || []).join("\n"); f.active.checked = p ? p.active : true;
-      COLOURS = p ? p.variants.map((v) => ({ id: v.id, name: v.name, swatch: v.swatch || "#141414", price: v.price && v.price !== p.price ? v.price : "", stock: typeof v.stock === "number" ? v.stock : "", images: [...v.images] })) : [{ name: "Black", swatch: "#141414", price: "", stock: "", images: [] }];
+      COLOURS = p ? p.variants.map((v) => ({ id: v.id, name: v.name, swatch: v.swatch || "#141414", price: v.price && v.price !== p.price ? v.price : "", stock: typeof v.stock === "number" ? v.stock : "", cost: typeof v.cost === "number" ? v.cost : "", images: [...v.images] })) : [{ name: "Black", swatch: "#141414", price: "", stock: "", cost: "", images: [] }];
       renderColours();
       $("#drawer").hidden = false; document.body.style.overflow = "hidden";
       setTimeout(() => f.name.focus(), 50);
@@ -244,8 +244,9 @@
         <div class="colour__top">
           <label>Colour name <input data-c="name" value="${esc(c.name)}" maxlength="40" placeholder="e.g. Black"></label>
           <label>Swatch <input type="color" data-c="swatch" value="${esc(c.swatch)}"></label>
-          <label class="vprice">Price ৳ <small>empty = main price</small><input type="number" data-c="price" value="${esc(c.price)}" min="50" step="10" placeholder="${esc($("#pform").price.value || "same")}"></label>
+          <label class="vprice">Price ৳ <small>empty = main</small><input type="number" data-c="price" value="${esc(c.price)}" min="50" step="10" placeholder="${esc($("#pform").price.value || "same")}"></label>
           <label class="vstock">Stock <small>${c.stock === "" || c.stock === undefined ? "∞" : +c.stock === 0 ? "sold out" : +c.stock <= 5 ? "low" : "in stock"}</small><input type="number" data-c="stock" value="${esc(c.stock ?? "")}" min="0" step="1" placeholder="∞"></label>
+          <label class="vcost">Buying ৳ <small>private</small><input type="number" data-c="cost" value="${esc(c.cost ?? "")}" min="0" step="1" placeholder="${esc($("#pform").cost.value || "—")}"></label>
           <button type="button" class="btn sm danger vdel" data-cdel ${COLOURS.length === 1 ? "disabled" : ""}>Remove</button>
         </div>
         <div class="thumbs">
@@ -255,12 +256,29 @@
           <label class="upload">+ Add photos<input type="file" accept="image/*" multiple data-upload></label>
         </div></div>`).join("");
       syncStock();
+      showProfit();
     }
-    $("#pform").price.addEventListener("input", (e) => $$('#colours [data-c="price"]').forEach((i) => (i.placeholder = e.target.value || "same")));
-    $("#addColour").onclick = () => { COLOURS.push({ name: "", swatch: "#141414", price: "", stock: "", images: [] }); renderColours(); };
+    $("#pform").price.addEventListener("input", (e) => { $$('#colours [data-c="price"]').forEach((i) => (i.placeholder = e.target.value || "same")); showProfit(); });
+    $("#pform").cost.addEventListener("input", (e) => { $$('#colours [data-c="cost"]').forEach((i) => (i.placeholder = e.target.value || "—")); showProfit(); });
+    // Profit per piece, live while typing (range when colours have their own price or buying price)
+    function showProfit() {
+      const f = $("#pform"), out = $("#profitOut");
+      const base = +f.price.value || 0, baseCost = f.cost.value === "" ? null : +f.cost.value;
+      const ps = (COLOURS.length ? COLOURS : [{}]).map((c) => {
+        const cost = c.cost !== "" && c.cost !== undefined ? +c.cost : baseCost;
+        return cost === null ? null : (c.price !== "" && c.price !== undefined ? +c.price : base) - cost;
+      });
+      out.className = "";
+      if (!base || ps.every((x) => x === null)) { out.textContent = "— add a buying price"; return; }
+      const known = ps.filter((x) => x !== null), lo = Math.min(...known), hi = Math.max(...known);
+      out.textContent = (lo === hi ? tk(lo) : `${tk(lo)} – ${tk(hi)}`) + (lo === hi ? ` (${Math.round((lo / base) * 100)}%)` : "") + (known.length < ps.length ? " · some colours missing" : "");
+      out.className = lo < 0 ? "neg" : "pos";
+    }
+    $("#addColour").onclick = () => { COLOURS.push({ name: "", swatch: "#141414", price: "", stock: "", cost: "", images: [] }); renderColours(); };
     $("#colours").addEventListener("input", (e) => {
       const el = e.target.closest("[data-c]"); if (!el) return;
       COLOURS[+el.closest("[data-ci]").dataset.ci][el.dataset.c] = el.value;
+      if (el.dataset.c === "price" || el.dataset.c === "cost") showProfit();
       if (el.dataset.c === "stock") {
         const sm = el.closest("label").querySelector("small");
         sm.textContent = el.value === "" ? "∞" : +el.value === 0 ? "sold out" : +el.value <= 5 ? "low" : "in stock";
@@ -314,9 +332,9 @@
       $("#perr").textContent = "";
       const body = {
         name: f.name.value, type: f.type.value, collection: f.collection.value, price: f.price.value,
-        compareAt: f.compareAt.value, stock: f.stock.value, badge: f.badge.value, tagline: f.tagline.value,
+        compareAt: f.compareAt.value, stock: f.stock.value, cost: f.cost.value, badge: f.badge.value, tagline: f.tagline.value,
         description: f.description.value, details: f.details.value.split("\n"), active: f.active.checked,
-        variants: COLOURS.map((c) => ({ id: c.id, name: c.name, swatch: c.swatch, price: c.price, stock: c.stock, images: c.images })),
+        variants: COLOURS.map((c) => ({ id: c.id, name: c.name, swatch: c.swatch, price: c.price, stock: c.stock, cost: c.cost, images: c.images })),
       };
       if (COLOURS.some((c) => !c.images.length)) { $("#perr").textContent = "Every colour needs at least one photo (or remove the colour)."; return; }
       const btn = $("#saveProduct"); btn.disabled = true; btn.textContent = "Saving…";
