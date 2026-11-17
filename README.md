@@ -120,6 +120,14 @@ a cancelled or returned order puts it back, and the product's total stock is the
 (shown read-only in the products list). A colour at 0 shows as sold out on the website; 5 or fewer shows "Only N left".
 Products with no colour numbers keep using the single product Stock box.
 
+## Discounts and waist sizes
+
+- **Discount price** (Admin → Products → Edit, or the sheet's "Discount price ✎" column): the regular price
+  is shown cut and the discount price highlighted, with a "−14%" badge and "Save ৳200". The same amount is
+  taken off every colour (including colours with their own price). Empty = no discount.
+- **Waist sizes**: each product has its own list of inch ranges (e.g. 30–32", 34–36"), the same for every colour.
+  "Use standard sizes" fills 28–30", 32–34", 36–38", 40–42". Orders record the size as the inch range.
+
 ## Buying prices and profit
 
 Each product has a private **Buying price** (and each colour can have its own). It is never sent to the

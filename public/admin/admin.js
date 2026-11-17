@@ -168,15 +168,15 @@
         ["Hidden", PRODUCTS.length - live.length],
         ["Sold out", live.filter((p) => p.stock === 0).length, live.some((p) => p.stock === 0) ? "alert" : ""],
         ["Low stock (≤5)", live.filter((p) => p.stock > 0 && p.stock <= 5).length],
-        ["On sale", live.filter((p) => p.compareAt).length],
+        ["On discount", live.filter((p) => p.salePrice).length],
       ].map(([k, v, c]) => `<div class="stat ${c || ""}"><b>${v}</b><span>${k}</span></div>`).join("");
       $("#plist").innerHTML = list.length ? list.map((p) => {
         const img0 = p.variants[0]?.images[0];
-        const tags = [!p.active ? `<span class="tag hid">Hidden</span>` : "", p.stock === 0 ? `<span class="tag out">Sold out</span>` : p.stock > 0 && p.stock <= 5 ? `<span class="tag low">Low stock</span>` : "", p.compareAt ? `<span class="tag">Sale</span>` : ""].join("");
+        const tags = [!p.active ? `<span class="tag hid">Hidden</span>` : "", p.stock === 0 ? `<span class="tag out">Sold out</span>` : p.stock > 0 && p.stock <= 5 ? `<span class="tag low">Low stock</span>` : "", p.salePrice ? `<span class="tag">−${Math.round(((p.price - p.salePrice) / p.price) * 100)}%</span>` : ""].join("");
         return `<div class="pitem ${p.active ? "" : "off"}" data-pid="${esc(p.id)}">
           <img src="${imgUrl(img0, true)}" alt="" loading="lazy">
           <div><h4>${esc(p.name)} ${tags}</h4>
-            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}<b>${priceRange(p)}</b>${typeof p.cost === "number" ? ` · <span class="muted">buy ${tk(p.cost)} · profit ${tk(p.price - p.cost)}</span>` : ""}</div></div>
+            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.salePrice ? `<s>${tk(p.price)}</s> <b style="color:#ff6b7d">${tk(p.salePrice)}</b>` : `<b>${priceRange(p)}</b>`}${typeof p.cost === "number" ? ` · <span class="muted">buy ${tk(p.cost)} · profit ${tk((p.salePrice || p.price) - p.cost)}</span>` : ""}</div></div>
           <div class="ctl">
             <label>Price <input type="number" min="50" step="10" value="${p.price}" data-f="price"></label>
             ${perColour(p) ? `<label title="${esc(p.variants.map((v) => `${v.name}: ${typeof v.stock === "number" ? v.stock : "∞"}`).join(" · "))}">Stock <input type="text" value="${p.stock ?? "∞"}" readonly class="ro" aria-label="Total stock (set per colour in Edit)"></label>` : `<label>Stock <input type="number" min="0" step="1" value="${p.stock ?? ""}" placeholder="∞" data-f="stock"></label>`}
@@ -228,9 +228,11 @@
       $("#perr").textContent = "";
       f.name.value = p?.name || ""; f.type.value = p?.type || "";
       f.collection.value = p?.collection || COLLECTIONS[0]?.id || "";
-      f.price.value = p?.price ?? ""; f.compareAt.value = p?.compareAt ?? ""; f.stock.value = p?.stock ?? ""; f.stock.dataset.was = p && !perColour(p) ? p.stock ?? "" : ""; f.cost.value = p?.cost ?? "";
+      f.price.value = p?.price ?? ""; f.salePrice.value = p?.salePrice ?? ""; f.stock.value = p?.stock ?? ""; f.stock.dataset.was = p && !perColour(p) ? p.stock ?? "" : ""; f.cost.value = p?.cost ?? "";
       f.badge.value = p?.badge || ""; f.tagline.value = p?.tagline || ""; f.description.value = p?.description || "";
       f.details.value = (p?.details || []).join("\n"); f.active.checked = p ? p.active : true;
+      SIZES = (p?.sizes?.length ? p.sizes : STD_SIZES).map((x) => ({ from: x.from, to: x.to }));
+      renderSizes();
       COLOURS = p ? p.variants.map((v) => ({ id: v.id, name: v.name, swatch: v.swatch || "#141414", price: v.price && v.price !== p.price ? v.price : "", stock: typeof v.stock === "number" ? v.stock : "", cost: typeof v.cost === "number" ? v.cost : "", images: [...v.images] })) : [{ name: "Black", swatch: "#141414", price: "", stock: "", cost: "", images: [] }];
       renderColours();
       $("#drawer").hidden = false; document.body.style.overflow = "hidden";
@@ -263,10 +265,11 @@
     // Profit per piece, live while typing (range when colours have their own price or buying price)
     function showProfit() {
       const f = $("#pform"), out = $("#profitOut");
-      const base = +f.price.value || 0, baseCost = f.cost.value === "" ? null : +f.cost.value;
+      const regular = +f.price.value || 0, sale = +f.salePrice.value || 0, off = sale && sale < regular ? regular - sale : 0;
+      const base = regular - off, baseCost = f.cost.value === "" ? null : +f.cost.value;
       const ps = (COLOURS.length ? COLOURS : [{}]).map((c) => {
         const cost = c.cost !== "" && c.cost !== undefined ? +c.cost : baseCost;
-        return cost === null ? null : (c.price !== "" && c.price !== undefined ? +c.price : base) - cost;
+        return cost === null ? null : (c.price !== "" && c.price !== undefined ? +c.price - off : base) - cost;
       });
       out.className = "";
       if (!base || ps.every((x) => x === null)) { out.textContent = "— add a buying price"; return; }
@@ -274,6 +277,20 @@
       out.textContent = (lo === hi ? tk(lo) : `${tk(lo)} – ${tk(hi)}`) + (lo === hi ? ` (${Math.round((lo / base) * 100)}%)` : "") + (known.length < ps.length ? " · some colours missing" : "");
       out.className = lo < 0 ? "neg" : "pos";
     }
+    $("#pform").salePrice.addEventListener("input", showProfit);
+    /* ---- waist sizes (same for every colour) ---- */
+    const STD_SIZES = [{ from: 28, to: 30 }, { from: 32, to: 34 }, { from: 36, to: 38 }, { from: 40, to: 42 }];
+    let SIZES = [];
+    function renderSizes() {
+      $("#sizes").innerHTML = SIZES.map((x, i) => `<div class="sizerow" data-si="${i}">
+        <input type="number" min="16" max="70" step="1" data-s="from" value="${esc(x.from)}" aria-label="From inch" placeholder="28"><span>–</span>
+        <input type="number" min="16" max="70" step="1" data-s="to" value="${esc(x.to)}" aria-label="To inch" placeholder="30"><span>inch</span>
+        <button type="button" class="btn sm danger" data-sdel aria-label="Remove size">✕</button></div>`).join("") || `<p class="muted" style="margin:0">No sizes yet.</p>`;
+    }
+    $("#sizes").addEventListener("input", (e) => { const el = e.target.closest("[data-s]"); if (el) SIZES[+el.closest("[data-si]").dataset.si][el.dataset.s] = el.value; });
+    $("#sizes").addEventListener("click", (e) => { if (e.target.closest("[data-sdel]")) { SIZES.splice(+e.target.closest("[data-si]").dataset.si, 1); renderSizes(); } });
+    $("#addSize").onclick = () => { const last = SIZES[SIZES.length - 1]; SIZES.push(last && last.to !== "" ? { from: +last.to + 2, to: +last.to + 4 } : { from: "", to: "" }); renderSizes(); };
+    $("#stdSizes").onclick = () => { SIZES = STD_SIZES.map((x) => ({ ...x })); renderSizes(); };
     $("#addColour").onclick = () => { COLOURS.push({ name: "", swatch: "#141414", price: "", stock: "", cost: "", images: [] }); renderColours(); };
     $("#colours").addEventListener("input", (e) => {
       const el = e.target.closest("[data-c]"); if (!el) return;
@@ -332,10 +349,11 @@
       $("#perr").textContent = "";
       const body = {
         name: f.name.value, type: f.type.value, collection: f.collection.value, price: f.price.value,
-        compareAt: f.compareAt.value, stock: f.stock.value, cost: f.cost.value, badge: f.badge.value, tagline: f.tagline.value,
+        salePrice: f.salePrice.value, sizes: SIZES.filter((x) => x.from !== "" || x.to !== ""), stock: f.stock.value, cost: f.cost.value, badge: f.badge.value, tagline: f.tagline.value,
         description: f.description.value, details: f.details.value.split("\n"), active: f.active.checked,
         variants: COLOURS.map((c) => ({ id: c.id, name: c.name, swatch: c.swatch, price: c.price, stock: c.stock, cost: c.cost, images: c.images })),
       };
+      if (!body.sizes.length) { $("#perr").textContent = "Add at least one waist size."; return; }
       if (COLOURS.some((c) => !c.images.length)) { $("#perr").textContent = "Every colour needs at least one photo (or remove the colour)."; return; }
       const btn = $("#saveProduct"); btn.disabled = true; btn.textContent = "Saving…";
       try {

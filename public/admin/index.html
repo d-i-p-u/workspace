@@ -93,6 +93,11 @@
     .colour { border: 1px solid var(--line); background: var(--ink-2); padding: 12px; display: grid; gap: 10px; }
     .colour__top { display: grid; grid-template-columns: 1fr 64px 100px 100px 90px auto; gap: 8px; align-items: end; }
     .costrow { border: 1px dashed var(--line); padding: 10px 12px; }
+    .sizerows { display: flex; flex-wrap: wrap; gap: 8px; }
+    .sizerow { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--ink-2); padding: 6px 8px; }
+    .sizerow input { width: 64px; }
+    .sizerow span { color: var(--dim); font-size: 12px; }
+    .salenote { font-size: 12px; color: #ff6b7d; min-height: 1em; }
     .profit { display: grid; align-content: end; gap: 4px; padding-bottom: 8px; }
     .profit small { color: var(--muted, #8a8a8a); font-size: .72rem; }
     .profit b { font-size: 1.1rem; }
@@ -256,7 +261,7 @@
         <div class="grid3">
           <label>Category <select name="collection" id="fcat"></select></label>
           <label>Price (BDT) * <input name="price" type="number" min="50" step="10" required></label>
-          <label>Old price <small>shows as a sale</small><input name="compareAt" type="number" min="0" step="10" placeholder="optional"></label>
+          <label>Discount price <small>regular price shows cut</small><input name="salePrice" type="number" min="1" step="10" placeholder="no discount"></label>
         </div>
         <div class="grid2 costrow">
           <label>Buying price (BDT) <small>private · never shown on the website</small><input name="cost" type="number" min="0" step="1" placeholder="what you pay per piece"></label>
@@ -270,6 +275,12 @@
         <label>Short line <small>shown under the name</small><input name="tagline" maxlength="140"></label>
         <label>Description <textarea name="description" maxlength="1200" rows="3"></textarea></label>
         <label>Details <small>one per line, e.g. "4 cm wide"</small><textarea name="details" rows="3"></textarea></label>
+        <fieldset>
+          <legend>Waist sizes (inch)</legend>
+          <p class="muted" style="margin:0">The sizes this product comes in. Customers see them as inch ranges, e.g. 28–30". Same for every colour.</p>
+          <div id="sizes" class="sizerows"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="addSize">+ Add size</button><button type="button" class="btn" id="stdSizes">Use standard sizes</button></div>
+        </fieldset>
         <fieldset>
           <legend>Colours and photos</legend>
           <p class="muted" style="margin:0">Each colour needs at least one photo. The first photo is the main one. Photos are resized automatically.</p>

@@ -368,6 +368,13 @@ section { padding: clamp(56px, 9vw, 120px) var(--gutter); }
 .card__badge--out { background: #3a3a3e; color: var(--bone); }
 .card.is-out .card__media img { filter: grayscale(1) opacity(.55); }
 .card__price s, .pdp__price s { color: var(--muted); font-weight: 400; margin-right: 6px; font-size: .85em; }
+.price-now { color: #ff3b4f; font-weight: 700; }
+.pdp__price.is-sale { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.pdp__price.is-sale s { margin-right: 0; }
+.pdp__price.is-sale small { flex-basis: 100%; margin-left: 0; }
+.pdp__price.is-sale .price-now { text-shadow: 0 0 18px rgba(255, 59, 79, .35); }
+.pdp__price .save { display: inline-block;padding: 3px 8px; font: 700 .7rem var(--f-mono); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--bone); background: var(--blood); vertical-align: middle; }
+.line__price s { font-weight: 400; font-size: .8em; margin-right: 4px; }
 .card__stock, .pdp__stock { margin: -4px 0 0; color: #ff8a8a; font: 700 .72rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
 .pdp__stock { margin: -10px 0 0; }
 .pdp__stock--out { color: var(--bone-dim); text-transform: none; letter-spacing: 0; font: 500 .92rem var(--f-body); }

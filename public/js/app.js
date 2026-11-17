@@ -34,6 +34,14 @@ function saveCart() {
 const product = (id) => DATA.products.find((p) => p.id === id);
 const variantPrice = (p, v) => v.price ?? p.price;
 const minPrice = (p) => Math.min(...p.variants.map((v) => variantPrice(p, v)));
+// Regular (cut) price of a colour when the product is discounted, else null
+const wasPrice = (p, v) => v.compareAt ?? (v.price ? null : p.compareAt) ?? null;
+const pctOff = (p) => (p.compareAt ? Math.round(((p.compareAt - p.price) / p.compareAt) * 100) : 0);
+const priceHTML = (now, was) => (was && was > now ? `<s>${tk(was)}</s> <b class="price-now">${tk(now)}</b>` : tk(now));
+// Waist sizes of a product (inch ranges)
+const sizesOf = (p) => (p.sizes && p.sizes.length ? p.sizes : DATA.sizes);
+const sizeText = (x) => (x.from === x.to ? `${x.from}"` : `${x.from}–${x.to}"`);
+const sizeById = (p, id) => sizesOf(p).find((x) => x.id === id);
 const soldOut = (p) => p.stock === 0;
 const lowStock = (p) => typeof p.stock === "number" && p.stock > 0 && p.stock <= 5;
 // Stock of one colour: products can track stock per colour; otherwise the product stock applies.
@@ -46,9 +54,9 @@ function cardHTML(p) {
   const v = p.variants[0];
   const second = v.images[1] || p.variants[1]?.images[0];
   const from = p.variants.some((x) => x.price && x.price !== p.price) ? "From " : "";
-  const label = soldOut(p) ? "Sold out" : p.compareAt ? "Sale" : p.badge;
+  const label = soldOut(p) ? "Sold out" : p.compareAt ? `−${pctOff(p)}%` : p.badge;
   const badge = label
-    ? `<span class="card__badge ${soldOut(p) ? "card__badge--out" : label === "Hot" || label === "Sale" ? "card__badge--hot" : ""}">${esc(label)}</span>`
+    ? `<span class="card__badge ${soldOut(p) ? "card__badge--out" : label === "Hot" || p.compareAt ? "card__badge--hot" : ""}">${esc(label)}</span>`
     : "";
   return `<article class="card ${soldOut(p) ? "is-out" : ""}">
     <div class="card__media">
@@ -59,7 +67,7 @@ function cardHTML(p) {
     </div>
     <div class="card__row">
       <div><h3 class="card__name">${esc(p.name)}</h3><p class="card__type">${esc(p.type)}</p></div>
-      <span class="card__price">${p.compareAt > minPrice(p) ? `<s>${tk(p.compareAt)}</s> ` : ""}${from}${tk(minPrice(p))}</span>
+      <span class="card__price ${p.compareAt ? "is-sale" : ""}">${from}${(() => { const mv = p.variants.reduce((a, x) => (variantPrice(p, x) < variantPrice(p, a) ? x : a)); return priceHTML(variantPrice(p, mv), wasPrice(p, mv)); })()}</span>
     </div>
     ${lowStock(p) ? `<p class="card__stock">Only ${p.stock} left</p>` : ""}
     <div class="swatches" aria-label="${p.variants.length} colours">${p.variants.map((x) => `<span class="sw" style="background:${x.swatch}" title="${esc(x.name)}"></span>`).join("")}</div>
@@ -157,15 +165,15 @@ function openProduct(id, variantId) {
           <h2 class="pdp__title" id="pdp-title">${esc(p.name)}</h2>
           <p class="pdp__type">${esc(p.type)} — ${esc(p.tagline)}</p>
         </div>
-        <div class="pdp__price">${p.compareAt > variantPrice(p, v) ? `<s>${tk(p.compareAt)}</s>` : ""}${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
+        <div class="pdp__price ${wasPrice(p, v) ? "is-sale" : ""}">${priceHTML(variantPrice(p, v), wasPrice(p, v))}${wasPrice(p, v) ? `<em class="save">Save ${tk(wasPrice(p, v) - variantPrice(p, v))}</em>` : ""}<small>Cash on delivery</small></div>
         ${out ? `<p class="pdp__stock pdp__stock--out">${soldOut(p) ? "Sold out" : `${esc(v.name)} is sold out. Pick another colour`}. Message us on WhatsApp to get notified when it's back.</p>` : left > 0 && left <= 5 ? `<p class="pdp__stock">Only ${left} left${colourNote}</p>` : ""}
         <div>
           <div class="opt-label mono"><span>Colour</span><span>${esc(v.name)}</span></div>
           <div class="colors">${p.variants.map((x) => `<button class="color-btn ${x.id === v.id ? "is-active" : ""} ${stockOf(p, x) === 0 ? "is-out" : ""}" data-variant="${x.id}"${stockOf(p, x) === 0 ? ' title="Sold out"' : ""}><span class="sw" style="background:${x.swatch}"></span>${esc(x.name)}</button>`).join("")}</div>
         </div>
         <div>
-          <div class="opt-label mono"><span>Waist size</span><a href="#faq" data-close-pdp class="muted">Size guide</a></div>
-          <div class="sizes">${DATA.sizes.map((s) => `<button class="size-btn ${s.id === size ? "is-active" : ""}" data-size="${s.id}">${s.id}<small>${esc(s.label.split("·")[1].trim())}</small></button>`).join("")}</div>
+          <div class="opt-label mono"><span>Waist size (inch)</span><a href="#faq" data-close-pdp class="muted">Size guide</a></div>
+          <div class="sizes">${sizesOf(p).map((s) => `<button class="size-btn ${s.id === size ? "is-active" : ""}" data-size="${esc(s.id)}">${esc(sizeText(s))}<small>waist</small></button>`).join("")}</div>
         </div>
         <div class="pdp__buy">
           <div class="qty"><button data-qty="-1" aria-label="Less">−</button><output>${qty}</output><button data-qty="1" aria-label="More">+</button></div>
@@ -251,10 +259,10 @@ function lineHTML(l, i, editable = true) {
     <img src="${img(l.v.images[0], true)}" alt="">
     <div>
       <h4>${esc(l.p.name)} <span class="muted">${esc(l.p.type)}</span></h4>
-      <p>${esc(l.v.name)} · Size ${esc(l.size)}${editable ? "" : ` · ×${l.qty}`}</p>
+      <p>${esc(l.v.name)} · Waist ${esc(sizeById(l.p, l.size) ? sizeText(sizeById(l.p, l.size)) : l.size)}${editable ? "" : ` · ×${l.qty}`}</p>
       ${editable ? `<div class="qty"><button data-line-qty="${i}" data-d="-1" aria-label="Less">−</button><output>${l.qty}</output><button data-line-qty="${i}" data-d="1" aria-label="More">+</button></div>` : ""}
     </div>
-    <div class="line__price"><span>${tk(l.unit * l.qty)}</span>${editable ? `<button class="line__remove" data-remove="${i}">Remove</button>` : ""}</div>
+    <div class="line__price"><span>${wasPrice(l.p, l.v) ? `<s class="muted">${tk(wasPrice(l.p, l.v) * l.qty)}</s> ` : ""}${tk(l.unit * l.qty)}</span>${editable ? `<button class="line__remove" data-remove="${i}">Remove</button>` : ""}</div>
   </div>`;
 }
 
@@ -483,7 +491,7 @@ async function init() {
     return;
   }
   // drop cart lines for products that no longer exist or are sold out
-  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId && stockOf(product(l.productId), v) !== 0) && !soldOut(product(l.productId)));
+  state.cart = state.cart.filter((l) => product(l.productId)?.variants.some((v) => v.id === l.variantId && stockOf(product(l.productId), v) !== 0) && !soldOut(product(l.productId)) && sizeById(product(l.productId), l.size));
   renderSocials();
   renderDeliveryCopy();
   renderCollections();

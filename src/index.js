@@ -9,7 +9,7 @@
 //   GET  /api/orders, /api/orders.csv           order list (JSON / CSV for Excel)
 //   PATCH /api/orders/:id                       status and/or admin_note (stock follows cancellations)
 //   GET/POST /api/admin/products, PUT/DELETE /api/admin/products/:id
-//   PATCH /api/products/:id                     quick edits: price, compare_at, stock, active
+//   PATCH /api/products/:id                     quick edits: price, sale_price, stock, cost, active
 //   GET/PUT /api/admin/collections, GET/PUT /api/admin/settings
 //   POST /api/admin/images                      raw image body → stored in D1
 //   GET /api/sheet, PATCH /api/sheet/:tab/:id   Google Sheets two-way sync
@@ -134,6 +134,12 @@ async function seedOnce(env) {
   ]);
   // Buying price (private: admin and Google Sheet only)
   await env.DB.prepare("ALTER TABLE products ADD COLUMN cost INTEGER").run().catch(() => {});
+  await env.DB.prepare("ALTER TABLE products ADD COLUMN sale_price INTEGER").run().catch(() => {});
+  await env.DB.prepare("ALTER TABLE products ADD COLUMN sizes TEXT").run().catch(() => {});
+  // old model: price = paid, compare_at = was → new model: price = regular, sale_price = discounted
+  await env.DB.prepare("UPDATE products SET sale_price = price, price = compare_at, compare_at = NULL WHERE compare_at IS NOT NULL AND compare_at > price")
+    .run()
+    .catch(() => {});
   const done = await env.DB.prepare("SELECT value FROM settings WHERE key = 'catalogue_seeded'").first();
   if (done) return;
   const overrides = new Map();
@@ -169,7 +175,8 @@ function rowToProduct(r) {
     type: r.type || "",
     collection: r.collection,
     price: r.price,
-    compareAt: r.compare_at ?? null,
+    salePrice: r.sale_price ?? null,
+    sizes: safeJSON(r.sizes, []),
     badge: r.badge || "",
     tagline: r.tagline || "",
     description: r.description || "",
@@ -188,6 +195,27 @@ function rowToProduct(r) {
 function publicProduct(p) {
   const { cost, ...rest } = p;
   return { ...rest, variants: (p.variants || []).map(({ cost, ...v }) => v) };
+}
+// Waist sizes: each product can have its own list of inch ranges; otherwise the standard ones.
+const DEFAULT_SIZES = seed.sizes.map((x) => {
+  const [from, to] = (x.label.match(/\d+/g) || []).map(Number);
+  return { id: `${from}-${to}`, from, to };
+});
+const sizesOf = (p) => (Array.isArray(p.sizes) && p.sizes.length ? p.sizes : DEFAULT_SIZES);
+const sizeLabel = (x) => (x.from === x.to ? `${x.from}"` : `${x.from}–${x.to}"`);
+// Discount: the product's discount price takes the same amount off every colour.
+// The public catalogue gets price = what the customer pays and compareAt = the regular (cut) price.
+function applySale(p) {
+  const { salePrice, ...rest } = p;
+  const off = typeof salePrice === "number" && salePrice > 0 && salePrice < p.price ? p.price - salePrice : 0;
+  const out = { ...rest, sizes: sizesOf(p), compareAt: null };
+  if (!off) return out;
+  return {
+    ...out,
+    price: p.price - off,
+    compareAt: p.price,
+    variants: p.variants.map((v) => (v.price ? { ...v, price: Math.max(v.price - off, 1), compareAt: v.price } : v)),
+  };
 }
 const unitCost = (p, v) => (typeof v?.cost === "number" ? v.cost : typeof p?.cost === "number" ? p.cost : null);
 const hasColourStock =(variants) => (variants || []).some((v) => typeof v.stock === "number");
@@ -221,7 +249,7 @@ async function loadProducts(env, { includeHidden = false } = {}) {
     /* table missing */
   }
   // Fallback before the database is seeded.
-  return seed.products.map((p, i) => ({ ...p, compareAt: null, stock: null, active: true, sort: i }));
+  return seed.products.map((p, i) => ({ ...p, salePrice: null, sizes: [], stock: null, active: true, sort: i }));
 }
 
 async function loadCollections(env) {
@@ -238,7 +266,7 @@ export async function getCatalog(env, opts = {}) {
   const [products, collections, settings] = await Promise.all([loadProducts(env, opts), loadCollections(env), getSettings(env)]);
   return {
     currency: "BDT",
-    sizes: seed.sizes,
+    sizes: DEFAULT_SIZES,
     delivery: {
       insideDhaka: Number(settings.delivery_inside) || 0,
       outsideDhaka: Number(settings.delivery_outside) || 0,
@@ -252,7 +280,7 @@ export async function getCatalog(env, opts = {}) {
       announcement: settings.announcement,
     },
     collections,
-    products: opts.withCost ? products : products.map(publicProduct),
+    products: opts.withCost ? products.map(applySale) : products.map((p) => publicProduct(applySale(p))),
   };
 }
 
@@ -260,14 +288,14 @@ export async function getCatalog(env, opts = {}) {
 export function priceOrder(items, zone, cat) {
   if (!Array.isArray(items) || items.length === 0) throw new Error("Your bag is empty.");
   if (items.length > 20) throw new Error("Too many line items.");
-  const sizes = new Set(cat.sizes.map((s) => s.id));
   const wanted = new Map();
   const lines = items.map((it) => {
     const product = cat.products.find((p) => p.id === it.productId);
     if (!product) throw new Error("One of the items is no longer available. Please remove it from your bag.");
     const variant = product.variants.find((v) => v.id === it.variantId);
     if (!variant) throw new Error(`Unknown colour for ${product.name}.`);
-    if (!sizes.has(it.size)) throw new Error(`Pick a size for ${product.name}.`);
+    const size = sizesOf(product).find((x) => x.id === it.size);
+    if (!size) throw new Error(`Pick a size for ${product.name}.`);
     const qty = Math.trunc(Number(it.qty));
     if (!(qty >= 1 && qty <= 10)) throw new Error("Quantity must be 1–10.");
     if (hasColourStock(product.variants)) {
@@ -290,7 +318,7 @@ export function priceOrder(items, zone, cat) {
       variantId: variant.id,
       name: `${product.name} ${product.type}`.trim(),
       color: variant.name,
-      size: it.size,
+      size: sizeLabel(size),
       qty,
       unit,
       total: unit * qty,
@@ -521,8 +549,18 @@ function readProductInput(b, existing = {}) {
   if (name.length < 2) errors.push("Product name is required.");
   const price = int(b.price ?? existing.price);
   if (!(price >= 50 && price <= 100000)) errors.push("Price must be between 50 and 100000.");
-  const compareAt = b.compareAt !== undefined ? int(b.compareAt) : existing.compareAt ?? null;
-  if (compareAt !== null && (Number.isNaN(compareAt) || compareAt <= price)) errors.push("Old price must be higher than the price (or empty).");
+  const salePrice = b.salePrice !== undefined ? int(b.salePrice) : existing.salePrice ?? null;
+  if (salePrice !== null && (Number.isNaN(salePrice) || salePrice < 1 || salePrice >= price)) errors.push("Discount price must be lower than the regular price (or empty).");
+  const sizesIn = Array.isArray(b.sizes) ? b.sizes : existing.sizes || [];
+  const sizes = [];
+  for (const x of sizesIn.slice(0, 12)) {
+    const from = int(x.from), to = int(x.to ?? x.from);
+    if (from === null && to === null) continue;
+    if (!(from >= 16 && from <= 70 && to >= from && to <= 70)) { errors.push("Each waist size needs inches between 16 and 70, with “from” not bigger than “to”."); break; }
+    const id = `${from}-${to}`;
+    if (!sizes.some((y) => y.id === id)) sizes.push({ id, from, to });
+  }
+  sizes.sort((a, c) => a.from - c.from || a.to - c.to);
   const cost = b.cost !== undefined ? int(b.cost) : existing.cost ?? null;
   if (cost !== null && (Number.isNaN(cost) || cost < 0 || cost > 100000)) errors.push("Buying price must be 0–100000 (or empty).");
   const stock = b.stock !== undefined ? int(b.stock) : existing.stock ?? null;
@@ -564,7 +602,8 @@ function readProductInput(b, existing = {}) {
       type: clean(b.type ?? existing.type, 60),
       collection: slugify(b.collection ?? existing.collection) || "punk",
       price,
-      compare_at: compareAt,
+      sale_price: salePrice,
+      sizes: JSON.stringify(sizes),
       badge: clean(b.badge ?? existing.badge, 24),
       tagline: clean(b.tagline ?? existing.tagline, 140),
       description: clean(b.description ?? existing.description, 1200),
@@ -581,17 +620,17 @@ async function saveProduct(env, id, v, isNew) {
   if (isNew) {
     const maxSort = await env.DB.prepare("SELECT COALESCE(MAX(sort), 0) AS s FROM products").first();
     await env.DB.prepare(
-      `INSERT INTO products (id, name, type, collection, price, compare_at, badge, tagline, description, details, variants, stock, active, sort, cost, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, datetime('now'), datetime('now'))`
+      `INSERT INTO products (id, name, type, collection, price, sale_price, badge, tagline, description, details, variants, stock, active, sort, cost, sizes, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, datetime('now'), datetime('now'))`
     )
-      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, (maxSort?.s || 0) + 1, v.cost)
+      .bind(id, v.name, v.type, v.collection, v.price, v.sale_price, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, (maxSort?.s || 0) + 1, v.cost, v.sizes)
       .run();
   } else {
     await env.DB.prepare(
-      `UPDATE products SET name=?2, type=?3, collection=?4, price=?5, compare_at=?6, badge=?7, tagline=?8, description=?9,
-       details=?10, variants=?11, stock=?12, active=?13, cost=?14, updated_at=datetime('now') WHERE id=?1`
+      `UPDATE products SET name=?2, type=?3, collection=?4, price=?5, sale_price=?6, compare_at=NULL, badge=?7, tagline=?8, description=?9,
+       details=?10, variants=?11, stock=?12, active=?13, cost=?14, sizes=?15, updated_at=datetime('now') WHERE id=?1`
     )
-      .bind(id, v.name, v.type, v.collection, v.price, v.compare_at, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, v.cost)
+      .bind(id, v.name, v.type, v.collection, v.price, v.sale_price, v.badge, v.tagline, v.description, v.details, v.variants, v.stock, v.active, v.cost, v.sizes)
       .run();
   }
 }
@@ -610,6 +649,8 @@ async function patchProduct(env, id, body) {
   if (body.price !== undefined) {
     const n = int(body.price);
     if (!(n >= 50 && n <= 100000)) return bad("Price must be a number between 50 and 100000");
+    const sale = body.salePrice !== undefined || body.sale_price !== undefined ? int(body.salePrice ?? body.sale_price) : p.salePrice;
+    if (typeof sale === "number" && sale >= n) return bad("The regular price must be higher than the discount price. Change or clear the discount first.");
     sets.push(`price = ?${args.push(n)}`);
     // colours with their own price move by the same amount
     const delta = n - p.price;
@@ -618,10 +659,11 @@ async function patchProduct(env, id, body) {
       sets.push(`variants = ?${args.push(JSON.stringify(vs))}`);
     }
   }
-  if (body.compareAt !== undefined || body.compare_at !== undefined) {
-    const n = int(body.compareAt ?? body.compare_at);
-    if (n !== null && (Number.isNaN(n) || n <= 0)) return bad("Old price must be a number (or empty)");
-    sets.push(`compare_at = ?${args.push(n)}`);
+  if (body.salePrice !== undefined || body.sale_price !== undefined) {
+    const n = int(body.salePrice ?? body.sale_price);
+    const regular = body.price !== undefined ? int(body.price) : p.price;
+    if (n !== null && (Number.isNaN(n) || n < 1 || n >= regular)) return bad("Discount price must be lower than the regular price (or empty to remove the discount)");
+    sets.push(`sale_price = ?${args.push(n)}`);
   }
   if (body.stock !== undefined) {
     const n = int(body.stock);
@@ -693,8 +735,8 @@ const SHEET_TABS = {
       // Order kept compatible with the first sync script; new columns are appended.
       ["id", "Product ID"], ["name", "Name"], ["type", "Type"], ["collection", "Collection"], ["price", "Price (BDT) ✎", "edit"],
       ["active", "Show on site ✎", "edit"], ["sold", "Units sold"], ["colors", "Colours"], ["url", "Product link"],
-      ["updated_bd", "Last updated", "date"], ["compare_at", "Old price ✎", "edit"], ["stock", "Stock ✎", "edit"],
-      ["cost", "Buying price ✎", "edit"], ["margin", "Profit per unit (BDT)"], ["margin_pct", "Margin %"],
+      ["updated_bd", "Last updated", "date"], ["sale_price", "Discount price ✎", "edit"], ["stock", "Stock ✎", "edit"],
+      ["cost", "Buying price ✎", "edit"], ["margin", "Profit per unit (BDT)"], ["margin_pct", "Margin %"], ["sizes", "Waist sizes"],
     ],
   },
 };
@@ -714,11 +756,12 @@ async function sheetData(env, url) {
     type: p.type,
     collection: colName(p.collection),
     price: p.price,
-    compare_at: p.compareAt ?? "",
+    sale_price: p.salePrice ?? "",
+    sizes: sizesOf(p).map(sizeLabel).join(", "),
     stock: p.stock ?? "",
     cost: p.cost ?? "",
-    margin: typeof p.cost === "number" ? p.price - p.cost : "",
-    margin_pct: typeof p.cost === "number" && p.price ? Math.round(((p.price - p.cost) / p.price) * 100) : "",
+    margin: typeof p.cost === "number" ? applySale(p).price - p.cost : "",
+    margin_pct: typeof p.cost === "number" && p.price ? Math.round(((applySale(p).price - p.cost) / applySale(p).price) * 100) : "",
     active: p.active,
     colors: p.variants
       .map((v) => v.name + (v.price && v.price !== p.price ? ` (৳${v.price})` : "") + (typeof v.cost === "number" ? ` {buy ৳${v.cost}}` : "") + (typeof v.stock === "number" ? ` [${v.stock} left]` : ""))
@@ -951,7 +994,7 @@ async function handle(request, env, ctx, url) {
       if (m && method === "PATCH") return await updateOrder(env, m[1], await request.json().catch(() => ({})));
 
       if (pathname === "/api/admin/products" && method === "GET") {
-        return json({ products: await loadProducts(env, { includeHidden: true }), collections: await loadCollections(env), sizes: seed.sizes });
+        return json({ products: await loadProducts(env, { includeHidden: true }), collections: await loadCollections(env), sizes: DEFAULT_SIZES });
       }
       if (pathname === "/api/admin/products" && method === "POST") {
         const b = await request.json().catch(() => ({}));
