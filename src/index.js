@@ -503,13 +503,14 @@ function readProductInput(b, existing = {}) {
       while (seen.has(id)) id += "-2";
       seen.add(id);
       const vp = v.price === "" || v.price === undefined || v.price === null ? undefined : int(v.price);
+      if (vp !== undefined && !(vp >= 50 && vp <= 100000)) errors.push(`Price for ${vname || "a colour"} must be between 50 and 100000 (or empty for the main price).`);
       const vs = int(v.stock);
       if (vs !== null && (Number.isNaN(vs) || vs < 0 || vs > 100000)) errors.push(`Stock for ${vname || "a colour"} must be 0 or more (or empty for unlimited).`);
       return {
         id,
         name: vname || "Default",
         swatch: /^#[0-9a-f]{6}$/i.test(v.swatch || "") ? v.swatch : "#141414",
-        ...(vp && vp > 0 ? { price: vp } : {}),
+        ...(vp >= 50 && vp <= 100000 && vp !== price ? { price: vp } : {}),
         ...(vs !== null && vs >= 0 ? { stock: vs } : {}),
         images: (Array.isArray(v.images) ? v.images : []).map((x) => clean(x, 80)).filter((x) => SAFE_IMAGE.test(x)).slice(0, 8),
       };

@@ -59,7 +59,7 @@ function cardHTML(p) {
     </div>
     <div class="card__row">
       <div><h3 class="card__name">${esc(p.name)}</h3><p class="card__type">${esc(p.type)}</p></div>
-      <span class="card__price">${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}${from}${tk(minPrice(p))}</span>
+      <span class="card__price">${p.compareAt > minPrice(p) ? `<s>${tk(p.compareAt)}</s> ` : ""}${from}${tk(minPrice(p))}</span>
     </div>
     ${lowStock(p) ? `<p class="card__stock">Only ${p.stock} left</p>` : ""}
     <div class="swatches" aria-label="${p.variants.length} colours">${p.variants.map((x) => `<span class="sw" style="background:${x.swatch}" title="${esc(x.name)}"></span>`).join("")}</div>
@@ -157,7 +157,7 @@ function openProduct(id, variantId) {
           <h2 class="pdp__title" id="pdp-title">${esc(p.name)}</h2>
           <p class="pdp__type">${esc(p.type)} — ${esc(p.tagline)}</p>
         </div>
-        <div class="pdp__price">${p.compareAt ? `<s>${tk(p.compareAt)}</s>` : ""}${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
+        <div class="pdp__price">${p.compareAt > variantPrice(p, v) ? `<s>${tk(p.compareAt)}</s>` : ""}${tk(variantPrice(p, v))}<small>Cash on delivery</small></div>
         ${out ? `<p class="pdp__stock pdp__stock--out">${soldOut(p) ? "Sold out" : `${esc(v.name)} is sold out. Pick another colour`}. Message us on WhatsApp to get notified when it's back.</p>` : left > 0 && left <= 5 ? `<p class="pdp__stock">Only ${left} left${colourNote}</p>` : ""}
         <div>
           <div class="opt-label mono"><span>Colour</span><span>${esc(v.name)}</span></div>

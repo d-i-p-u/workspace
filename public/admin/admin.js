@@ -176,7 +176,7 @@
         return `<div class="pitem ${p.active ? "" : "off"}" data-pid="${esc(p.id)}">
           <img src="${imgUrl(img0, true)}" alt="" loading="lazy">
           <div><h4>${esc(p.name)} ${tags}</h4>
-            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}<b>${tk(p.price)}</b></div></div>
+            <div class="meta">${esc(p.type)} · ${esc(colName(p.collection))} · ${p.variants.length} colour${p.variants.length === 1 ? "" : "s"} · ${p.compareAt ? `<s>${tk(p.compareAt)}</s> ` : ""}<b>${priceRange(p)}</b></div></div>
           <div class="ctl">
             <label>Price <input type="number" min="50" step="10" value="${p.price}" data-f="price"></label>
             ${perColour(p) ? `<label title="${esc(p.variants.map((v) => `${v.name}: ${typeof v.stock === "number" ? v.stock : "∞"}`).join(" · "))}">Stock <input type="text" value="${p.stock ?? "∞"}" readonly class="ro" aria-label="Total stock (set per colour in Edit)"></label>` : `<label>Stock <input type="number" min="0" step="1" value="${p.stock ?? ""}" placeholder="∞" data-f="stock"></label>`}
@@ -201,6 +201,12 @@
     /* ---------------- product editor ---------------- */
     let EDIT = null; // product id being edited, or null for new
     let COLOURS = [];
+    // "৳1,450" or "৳1,450 – ৳1,790" when colours have their own prices
+    function priceRange(p) {
+      const ps = p.variants.map((v) => v.price || p.price);
+      const lo = Math.min(p.price, ...ps), hi = Math.max(p.price, ...ps);
+      return lo === hi ? tk(lo) : `${tk(lo)} – ${tk(hi)}`;
+    }
     const perColour = (p) => (p.variants || []).some((v) => typeof v.stock === "number");
     // When any colour has a stock number, the product stock is the sum of its colours.
     function syncStock() {
@@ -238,7 +244,7 @@
         <div class="colour__top">
           <label>Colour name <input data-c="name" value="${esc(c.name)}" maxlength="40" placeholder="e.g. Black"></label>
           <label>Swatch <input type="color" data-c="swatch" value="${esc(c.swatch)}"></label>
-          <label class="vprice">Own price <small>optional</small><input type="number" data-c="price" value="${esc(c.price)}" min="0" step="10" placeholder="same"></label>
+          <label class="vprice">Price ৳ <small>empty = main price</small><input type="number" data-c="price" value="${esc(c.price)}" min="50" step="10" placeholder="${esc($("#pform").price.value || "same")}"></label>
           <label class="vstock">Stock <small>${c.stock === "" || c.stock === undefined ? "∞" : +c.stock === 0 ? "sold out" : +c.stock <= 5 ? "low" : "in stock"}</small><input type="number" data-c="stock" value="${esc(c.stock ?? "")}" min="0" step="1" placeholder="∞"></label>
           <button type="button" class="btn sm danger vdel" data-cdel ${COLOURS.length === 1 ? "disabled" : ""}>Remove</button>
         </div>
@@ -250,6 +256,7 @@
         </div></div>`).join("");
       syncStock();
     }
+    $("#pform").price.addEventListener("input", (e) => $$('#colours [data-c="price"]').forEach((i) => (i.placeholder = e.target.value || "same")));
     $("#addColour").onclick = () => { COLOURS.push({ name: "", swatch: "#141414", price: "", stock: "", images: [] }); renderColours(); };
     $("#colours").addEventListener("input", (e) => {
       const el = e.target.closest("[data-c]"); if (!el) return;
